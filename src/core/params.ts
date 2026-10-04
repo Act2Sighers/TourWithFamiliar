@@ -95,6 +95,8 @@ export interface Params {
   };
   /** ラン全体。観測者が倒れてから、ワールドが止まるまでのウェイト(秒) */
   run: { defeatWait: number };
+  /** 演出。召喚・送還の波紋が出ている時間(秒) */
+  effects: { teleportDuration: number };
   /** キャラクター同士の押し合い。質量 = 半径 ^ massExponent */
   collision: { enabled: number; massExponent: number };
   view: { zoom: number; showChunkBorders: number; decorOpacity: number; showStandbyRange: number; showAttackAreas: number };
@@ -170,6 +172,7 @@ export const PARAM_META: ParamMeta[] = [
   { path: "down.reviveRange", label: "助け起こしの距離", min: 20, max: 200, step: 2 },
   { path: "down.vanishDelay", label: "送還までの時間(秒)", min: 0.1, max: 5, step: 0.1 },
   { path: "run.defeatWait", label: "観測者が倒れてから止まるまで(秒)", min: 0, max: 10, step: 0.5 },
+  { path: "effects.teleportDuration", label: "召喚・送還の演出の長さ(秒)", min: 0.1, max: 3, step: 0.1 },
   { path: "collision.enabled", label: "押し合い(0/1)", min: 0, max: 1, step: 1 },
   { path: "collision.massExponent", label: "押し合いの質量(半径のべき乗)", min: 0, max: 4, step: 0.5 },
   { path: "input.deadzone", label: "スティック遊び", min: 0, max: 0.6, step: 0.01 },

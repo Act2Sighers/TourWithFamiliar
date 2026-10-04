@@ -3,6 +3,7 @@ import type { Decor } from "../core/sim/chunks";
 import { WATCHER_NAME, shouldShowHpBar, type Body } from "../core/sim/body";
 import { attackArea, weaponOf, type Fighter } from "../core/sim/combat";
 import type { Enemy } from "../core/sim/enemy";
+import type { TeleportEffect } from "../core/sim/effects";
 import type { Familiar } from "../core/sim/familiar";
 import type { World } from "../core/sim/world";
 
@@ -83,12 +84,15 @@ export class Renderer {
     }
     for (const f of world.familiars) {
       // 送還が決まったファミリアは、消えるまでの間に薄くなる
-      this.ctx.globalAlpha = f.vanishing ? Math.max(0, 1 - f.downTimer / this.params.down.vanishDelay) : 1;
+      // 召喚された直後は、演出の間に、徐々に現れる
+      this.ctx.globalAlpha =
+        (f.vanishing ? Math.max(0, 1 - f.downTimer / this.params.down.vanishDelay) : 1) * world.appearAlpha(f.id);
       this.drawCharacter(f, alpha, this.familiarColor(f), f.state === "intercept");
       this.ctx.globalAlpha = 1;
       if (f.down && !f.vanishing) this.drawReviveGauge(f, alpha, f === reviveTarget);
     }
     this.drawCharacter(wt, alpha, wt.hp <= 0 ? "#b9b0d9" : "#6a4cff", false);
+    for (const e of world.effects) this.drawTeleportEffect(e);
     for (const e of world.enemies) this.drawHpBar(e, alpha);
     for (const n of world.neutrals) this.drawHpBar(n, alpha);
     for (const f of world.familiars) this.drawHpBar(f, alpha);
@@ -166,6 +170,35 @@ export class Renderer {
     if (f.down) return "#c9b6bf";
     if (f.role === "companion") return f.lost ? "#f2c9a0" : "#f5a25d";
     return f.lost ? "#e6a3bd" : "#ff7aa8";
+  }
+
+  /**
+   * 召喚・送還の演出。
+   * - 送還(消える): そのファミリアの薄い影が消えていき、波紋が外へ広がる。
+   * - 召喚(現れる): 波紋が中心へ縮んでいき、その個体が徐々に現れる。
+   * 波紋は2重で、少しずつずらす。ほかの理由で消える・現れる存在と、見分けがつくようにする。
+   */
+  private drawTeleportEffect(e: TeleportEffect): void {
+    const ctx = this.ctx;
+    const t = Math.min(1, e.age / e.duration);
+    const rgb = e.role === "aide" ? "255, 122, 168" : "245, 162, 93";
+    if (e.kind === "vanish") {
+      ctx.fillStyle = `rgba(${rgb}, ${0.55 * (1 - t)})`;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.radius * (1 + 0.25 * t), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (let k = 0; k < 2; k++) {
+      const tt = Math.min(1, Math.max(0, (t - k * 0.15) / (1 - k * 0.15)));
+      if (tt <= 0 || tt >= 1) continue;
+      const spread = e.kind === "vanish" ? tt : 1 - tt; // 消える: 外へ / 現れる: 中心へ
+      const fade = e.kind === "vanish" ? 1 - tt : 1 - Math.abs(2 * tt - 1); // 現れる: 途中が最も濃い
+      ctx.strokeStyle = `rgba(${rgb}, ${0.9 * fade})`;
+      ctx.lineWidth = 1 + 2.5 * fade;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.radius * (0.9 + 2.4 * spread), 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   /** インタラクトの対象であることを示す点線の輪。 */

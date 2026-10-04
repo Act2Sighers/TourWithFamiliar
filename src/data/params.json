@@ -70,6 +70,7 @@
   },
   "down": { "reviveTime": 3, "reviveHpRatio": 0.15, "reviveKeepProgress": 0, "reviveRange": 48, "vanishDelay": 1.5 },
   "run": { "defeatWait": 2 },
+  "effects": { "teleportDuration": 0.7 },
   "collision": { "enabled": 1, "massExponent": 2 },
   "view": { "zoom": 1, "showChunkBorders": 1, "decorOpacity": 0.5, "showStandbyRange": 1, "showAttackAreas": 1 },
   "input": { "deadzone": 0 }

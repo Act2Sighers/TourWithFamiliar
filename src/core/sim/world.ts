@@ -6,6 +6,7 @@ import { Base } from "./base";
 import { ChunkMap } from "./chunks";
 import { WATCHER_NAME, createBody, damage, distance, halt, isDown, setMaxHp, stepMotion, type Body } from "./body";
 import { resolveCollisions } from "./collision";
+import { APPEAR_FADE_RATIO, type TeleportEffect, type TeleportKind } from "./effects";
 import { hitCircle, weaponOf, type Fighter } from "./combat";
 import { createEnemy, enemyAbilities, stepEnemy, type Enemy } from "./enemy";
 import { createNeutral, neutralAbilities, stepNeutral, type Neutral } from "./neutral";
@@ -44,6 +45,8 @@ export class World {
   familiars: Familiar[] = [];
   enemies: Enemy[] = [];
   neutrals: Neutral[] = [];
+  /** 召喚・送還の演出(見た目だけ。ワールドの時間で進み、終わったら消える) */
+  effects: TeleportEffect[] = [];
   readonly chunks: ChunkMap;
   private nextId = 1;
 
@@ -165,6 +168,11 @@ export class World {
     return this.enemyTargets().find((b) => b.id === id);
   }
 
+  /** 戦闘中か: 観測者またはファミリアが、いずれかの敵の攻撃対象になっている。(中立個体を狙う敵は含まない) */
+  inCombat(): boolean {
+    return this.enemies.some((e) => !isDown(e) && this.engagedOnPlayerSide(e));
+  }
+
   /** 敵が、観測者またはファミリアを攻撃対象にして臨戦になっているか。(中立個体を狙う敵は含まない) */
   engagedOnPlayerSide(e: Enemy): boolean {
     return e.state === "engaged" && e.targetId !== null && this.isPlayerSide(e.targetId);
@@ -183,6 +191,26 @@ export class World {
       }
     }
     return best;
+  }
+
+  /** 召喚・送還の演出を出す。 */
+  private emitTeleport(kind: TeleportKind, f: Familiar): void {
+    this.effects.push({
+      kind,
+      x: f.x,
+      y: f.y,
+      radius: f.radius,
+      role: f.role,
+      targetId: f.id,
+      age: 0,
+      duration: Math.max(0.01, this.params.effects.teleportDuration),
+    });
+  }
+
+  /** 召喚の演出の間、その個体をどのくらい見せるか(0=見えない … 1=完全に見える)。演出が無ければ 1。 */
+  appearAlpha(id: number): number {
+    const e = this.effects.find((o) => o.kind === "appear" && o.targetId === id);
+    return e ? Math.min(1, e.age / (e.duration * APPEAR_FADE_RATIO)) : 1;
   }
 
   /** 持っているファミリアの総数(同行中 + 拠点)。 */
@@ -246,6 +274,7 @@ export class World {
     f.y = f.prevY = this.watcher.y + Math.sin(a) * r;
     resetFieldState(f, this.params);
     this.familiars.push(f);
+    this.emitTeleport("appear", f);
     return "ok";
   }
 
@@ -285,6 +314,7 @@ export class World {
   dispatchToBase(id: number): boolean {
     const f = this.familiars.find((o) => o.id === id);
     if (!f || !this.canDispatch(f)) return false;
+    this.emitTeleport("vanish", f); // 消える場所に出す(拠点へ送る前の位置)
     this.familiars = this.familiars.filter((o) => o !== f);
     this.base.receive(f, this.params);
     return true;
@@ -320,7 +350,9 @@ export class World {
       }
     }
     if (hire) return { kind: "hire", neutral: hire };
-    // 話しかける: 戦闘不能でない同行中のファミリアのうち、最も近い者
+    // 話しかける: 戦闘中(観測者かファミリアが、いずれかの敵の攻撃対象になっている間)は出さない。
+    // それ以外は、戦闘不能でない同行中のファミリアのうち、最も近い者
+    if (this.inCombat()) return null;
     let talk: Familiar | null = null;
     let talkD = this.params.party.talkRange;
     for (const f of this.familiars) {
@@ -446,6 +478,9 @@ export class World {
 
     this.chunks.prune(this.chunks.coordOf(w.x), this.chunks.coordOf(w.y));
 
+    for (const e of this.effects) e.age += dt;
+    if (this.effects.some((e) => e.age >= e.duration)) this.effects = this.effects.filter((e) => e.age < e.duration);
+
     this.tick++;
     this.time += dt;
   }
@@ -469,7 +504,10 @@ export class World {
     if (!this.familiars.some((f) => f.vanishing && f.downTimer >= delay)) return;
     const keep: Familiar[] = [];
     for (const f of this.familiars) {
-      if (f.vanishing && f.downTimer >= delay) this.base.receive(f, this.params);
+      if (f.vanishing && f.downTimer >= delay) {
+        this.emitTeleport("vanish", f);
+        this.base.receive(f, this.params);
+      }
       else keep.push(f);
     }
     this.familiars = keep;
