@@ -11,6 +11,12 @@ const BASE_VIEW = 600;
 const GRID = 64;
 /** 名前が収まる円(描かない)の半径 / 本体の半径 */
 const NAME_AREA_RATIO = 0.8;
+/**
+ * 名前が収まる円の半径。円は本体の半径の80%。
+ * 正多角形(外接円が半径)は、その内接円(= 半径 × cos(π/辺の数))に収める。正三角形なら半径の半分。
+ */
+const regularPolygonNameRadius = (radius: number, sides: number): number => radius * Math.cos(Math.PI / sides);
+const ENEMY_SIDES = 3;
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -302,7 +308,7 @@ export class Renderer {
     }
     ctx.closePath();
     ctx.fill();
-    this.drawName(e.name, x, y, e.radius * NAME_AREA_RATIO);
+    this.drawName(e.name, x, y, regularPolygonNameRadius(e.radius, ENEMY_SIDES));
   }
 
   /** 攻撃範囲。前隙の間は輪郭だけ、持続の間は塗りつぶす。 */

@@ -1,6 +1,8 @@
 import "./style.css";
 import { createDefaultParams } from "./core/params";
+import { CandidateSelection } from "./core/selection";
 import { Game } from "./core/sim/game";
+import { FAMILIAR_KINDS } from "./core/sim/kinds";
 import { FixedStepper } from "./core/stepper";
 import { DebugPanel } from "./debug/panel";
 import { GamepadInput } from "./input/gamepad";
@@ -25,9 +27,13 @@ const dialogMessage = document.getElementById("dialog-message") as HTMLElement;
 const dialogHint = document.getElementById("dialog-hint") as HTMLElement;
 const dialogYes = document.getElementById("dialog-yes") as HTMLElement;
 const dialogNo = document.getElementById("dialog-no") as HTMLElement;
+const selectEl = document.getElementById("select") as HTMLElement;
+const selectList = document.getElementById("select-list") as HTMLElement;
+const selectStart = document.getElementById("select-start") as HTMLButtonElement;
 
 const initialSeed = 12345;
-const game = new Game(initialSeed, params);
+const game = new Game(initialSeed, params, { autoStart: false });
+const selection = new CandidateSelection(FAMILIAR_KINDS.length);
 const renderer = new Renderer(canvas, params);
 const stepper = new FixedStepper(params.sim.hz);
 const inputs = new InputManager([new KeyboardInput(), new GamepadInput(), new TouchInput(canvas, menuBtn, interactBtn)]);
@@ -46,9 +52,11 @@ const panel = new DebugPanel(
     onDebugSpawnEnemy: () => game.world.debugSpawnEnemy(),
     onDebugSendFamiliarAway: () => game.world.debugSendFamiliarAway(),
     onResetWorld: (seed) => {
-      game.reset(seed);
+      game.reset(seed, true); // 最初の側近の選択画面へ戻る
+      selection.reset();
       stepper.reset();
       syncOverlay();
+      renderSelect();
     },
     getStats: () => {
       const w = game.world;
@@ -119,6 +127,39 @@ function cancelDialog(): void {
   stepper.reset();
 }
 
+/** 最初の側近の選択画面。候補のカードを作り直し、選択状態を表示に反映する。 */
+function renderSelect(): void {
+  selectEl.hidden = game.mode !== "select";
+  if (game.mode !== "select") return;
+  selectList.innerHTML = "";
+  FAMILIAR_KINDS.forEach((kind, i) => {
+    const a = kind.abilities(params);
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "candidate" + (selection.focus === i ? " focus" : "") + (selection.selected === i ? " selected" : "");
+    card.innerHTML =
+      `<div class="candidate-icon">${kind.name}</div>` +
+      `<div class="candidate-stats">丈夫さ ${a.toughness}<br />攻撃力 ${a.attack}<br />素早さ ${a.agility}</div>`;
+    card.addEventListener("click", () => {
+      selection.select(i);
+      renderSelect();
+    });
+    selectList.append(card);
+  });
+  selectStart.disabled = !selection.canStart;
+}
+
+function startRun(): void {
+  const i = selection.selected;
+  if (i === null) return;
+  if (game.startRun(FAMILIAR_KINDS[i]!.id)) {
+    stepper.reset();
+    renderSelect();
+  }
+}
+selectStart.addEventListener("click", startRun);
+let prevNav = 0;
+
 /** 確認ダイアログの表示を、ゲームの状態に合わせる。 */
 let shownDialog: string | null = null;
 function syncDialog(): void {
@@ -162,7 +203,19 @@ function frame(now: number): void {
   if (frameDt > 0) fps += (1 / frameDt - fps) * 0.1;
 
   const input = inputs.poll(params.input.deadzone);
-  if (game.mode === "dialog") {
+  if (game.mode === "select") {
+    // 最初の側近の選択: ← → / 十字キーで選ぶ、Enter / A で決定(未選択なら選び、選択済みなら開始)
+    const nav = input.moveX > 0.6 ? 1 : input.moveX < -0.6 ? -1 : 0;
+    if (nav !== 0 && nav !== prevNav) {
+      selection.move(nav);
+      renderSelect();
+    }
+    prevNav = nav;
+    if (input.confirmPressed) {
+      if (selection.confirm()) startRun();
+      else renderSelect();
+    }
+  } else if (game.mode === "dialog") {
     // ダイアログ表示中: Enter/A = はい(OK)、Esc/Start/B = いいえ(閉じる)
     if (input.confirmPressed) confirmDialog();
     else if (input.menuPressed || input.cancelPressed) cancelDialog();
@@ -197,6 +250,7 @@ function frame(now: number): void {
     }
   }
   syncDialog();
+  if (selectEl.hidden !== (game.mode !== "select")) renderSelect(); // 画面の外から状態が変わっても表示を合わせる
   const defeated = game.defeatTimer !== null;
   if (defeatEl.hidden === defeated) defeatEl.hidden = !defeated;
 
@@ -205,6 +259,7 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
 }
 
+renderSelect();
 requestAnimationFrame(frame);
 
 // 動作確認・自動テスト用

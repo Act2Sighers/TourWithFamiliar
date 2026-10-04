@@ -1,6 +1,7 @@
 // C#: Familiar / FamiliarBrain(待機 ⇄ 迎撃。存在範囲の外では迷子速度で観測者へ戻る)
 import type { Params } from "../params";
 import { Rng, hash2 } from "../rng";
+import { DEFAULT_KIND_ID, FAMILIAR_KINDS, kindById } from "./kinds";
 import { createBody, distance, halt, isDown, setMaxHp, steerToward } from "./body";
 import { chaseAndAttack } from "./behavior";
 import { createCombat, isBusy, resetCombat, stepCombat, weaponOf, type Fighter } from "./combat";
@@ -17,6 +18,8 @@ export type FamiliarState = "standby" | "intercept";
 export type WanderMode = "return" | "idle" | "walk";
 
 export interface Familiar extends Fighter {
+  /** ファミリアの種類(FamiliarKind.id) */
+  kindId: string;
   role: FamiliarRole;
   state: FamiliarState;
   /** 迎撃中の相手(敵)。待機中は null */
@@ -42,14 +45,25 @@ const WALK_REACH = 0.9;
 /** 目的地に着いたとみなす距離。 */
 const ARRIVE = 6;
 
-export function familiarAbilities(p: Params): Abilities {
-  return { toughness: p.familiar.toughness, attack: p.familiar.attack, agility: p.familiar.agility };
+/** 種類ごとの初期の能力値。 */
+export function familiarAbilities(p: Params, kindId: string = DEFAULT_KIND_ID): Abilities {
+  return (kindById(kindId) ?? FAMILIAR_KINDS[0]!).abilities(p);
 }
 
-export function createFamiliar(id: number, role: FamiliarRole, x: number, y: number, seed: number, p: Params): Familiar {
-  const abilities = familiarAbilities(p);
+export function createFamiliar(
+  id: number,
+  role: FamiliarRole,
+  x: number,
+  y: number,
+  seed: number,
+  p: Params,
+  kindId: string = DEFAULT_KIND_ID,
+): Familiar {
+  const kind = kindById(kindId) ?? FAMILIAR_KINDS[0]!;
+  const abilities = kind.abilities(p);
   return {
-    ...createBody(id, x, y, p.familiar.radius, maxHpOf(abilities, p), "FM"),
+    ...createBody(id, x, y, p.familiar.radius, maxHpOf(abilities, p), kind.name),
+    kindId: kind.id,
     abilities,
     weaponId: "unarmed",
     combat: createCombat(),

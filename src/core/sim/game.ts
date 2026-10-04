@@ -2,13 +2,14 @@
 import type { MoveInput } from "../input";
 import type { Params } from "../params";
 import { isDown } from "./body";
+import { DEFAULT_KIND_ID, kindById } from "./kinds";
 import { World } from "./world";
 
 /**
- * world=進行中 / overlay=メニュー表示中 / dialog=確認ダイアログ表示中 / ended=観測者が倒れてワールドが止まった。
+ * select=最初の側近を選んでいる(ランの開始前) / world=進行中 / overlay=メニュー表示中 / dialog=確認ダイアログ表示中 / ended=観測者が倒れてワールドが止まった。
  * overlay・dialog・ended の間は、ワールドの時間は完全に停止する(急かさない方針)。
  */
-export type GameMode = "world" | "overlay" | "dialog" | "ended";
+export type GameMode = "select" | "world" | "overlay" | "dialog" | "ended";
 
 /** hire=雇用の確認 / full=人数上限で雇えない(OKのみ) */
 export type DialogState = { kind: "hire"; neutralId: number } | { kind: "full" };
@@ -27,20 +28,36 @@ export class Game {
   /** 前ステップのインタラクトボタンの状態(押した瞬間を検出するため) */
   private prevInteract = false;
 
+  /**
+   * @param options.autoStart true(既定)なら、最初の側近を選ぶ画面を飛ばして、標準のファミリアを連れた状態で始める(テストや自動実行用)。
+   *   false なら、最初の側近の選択画面(mode=select)から始まり、startRun で開始する。
+   */
   constructor(
     public seed: number,
     private params: Params,
+    options: { autoStart?: boolean } = {},
   ) {
-    this.world = this.createWorld(seed);
+    const autoStart = options.autoStart ?? true;
+    this.world = this.createWorld(seed, autoStart);
+    this.mode = autoStart ? "world" : "select";
   }
 
-  /** 最初の側近を1人連れ、周囲に敵と中立個体がいる状態で始める(側近の選択UIや敵の出現の仕組みは後で作る)。 */
-  private createWorld(seed: number): World {
+  /** 周囲に敵と中立個体がいる状態のワールドを作る(敵の出現の仕組みは後で作る)。最初の側近は、選択のあとで加わる。 */
+  private createWorld(seed: number, withAide: boolean): World {
     const world = new World(seed, this.params);
-    world.spawnFamiliar("aide");
     world.spawnInitialEnemies();
     world.spawnInitialNeutrals();
+    if (withAide) world.spawnFamiliar("aide", DEFAULT_KIND_ID);
     return world;
+  }
+
+  /** 最初の側近を決めてランを始める。選択画面(mode=select)のときだけ有効。 */
+  startRun(kindId: string): boolean {
+    if (this.mode !== "select" || !kindById(kindId)) return false;
+    this.world.spawnFamiliar("aide", kindId);
+    this.mode = "world";
+    this.prevInteract = false;
+    return true;
   }
 
   /** ワールド時間を進める。オーバーレイ・ダイアログ中は完全に停止する。 */
@@ -97,14 +114,15 @@ export class Game {
 
   toggleOverlay(): void {
     if (this.defeatTimer !== null) return; // 倒れたあとは何もできない
-    if (this.mode === "ended" || this.mode === "dialog") return;
+    if (this.mode === "ended" || this.mode === "dialog" || this.mode === "select") return;
     this.mode = this.mode === "world" ? "overlay" : "world";
   }
 
-  reset(seed: number): void {
+  /** ワールドを作り直す。toSelect が true なら、最初の側近の選択画面へ戻る。 */
+  reset(seed: number, toSelect = false): void {
     this.seed = seed;
-    this.world = this.createWorld(seed);
-    this.mode = "world";
+    this.world = this.createWorld(seed, !toSelect);
+    this.mode = toSelect ? "select" : "world";
     this.dialog = null;
     this.defeatTimer = null;
     this.prevInteract = false;

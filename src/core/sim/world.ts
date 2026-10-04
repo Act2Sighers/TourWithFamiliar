@@ -55,8 +55,8 @@ export class World {
   // ---- 生成 ----
 
   /** 観測者の近くにファミリアを1体出す。M1では能力値は調整パネルの値(全員同じ)。 */
-  spawnFamiliar(role: FamiliarRole): Familiar {
-    const f = createFamiliar(this.nextId++, role, this.watcher.x + 40, this.watcher.y + 30, this.seed, this.params);
+  spawnFamiliar(role: FamiliarRole, kindId?: string): Familiar {
+    const f = createFamiliar(this.nextId++, role, this.watcher.x + 40, this.watcher.y + 30, this.seed, this.params, kindId);
     this.familiars.push(f);
     return f;
   }
@@ -108,7 +108,7 @@ export class World {
 
   /** 調整パネルで変えた能力値を、既存のファミリア・敵に反映する(M1のみの暫定処理)。 */
   applyTemplateAbilities(): void {
-    for (const f of this.familiars) f.abilities = familiarAbilities(this.params);
+    for (const f of this.familiars) f.abilities = familiarAbilities(this.params, f.kindId);
     for (const e of this.enemies) e.abilities = enemyAbilities(this.params);
     for (const n of this.neutrals) n.abilities = neutralAbilities(this.params);
   }

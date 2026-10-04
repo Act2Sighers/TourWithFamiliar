@@ -276,3 +276,89 @@ body {
 .dialog-buttons button[hidden] {
   display: none;
 }
+
+#select {
+  position: fixed;
+  inset: 0;
+  z-index: 24;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 244, 232, 0.94);
+}
+
+#select[hidden] {
+  display: none;
+}
+
+.select-panel {
+  width: min(92vw, 520px);
+  text-align: center;
+  color: #4a2a5a;
+}
+
+.select-panel h1 {
+  margin: 0 0 18px;
+  font-size: 22px;
+}
+
+#select-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.candidate {
+  width: 150px;
+  padding: 14px 10px 12px;
+  border: 3px solid transparent;
+  border-radius: 16px;
+  background: #fffaf4;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
+  color: inherit;
+  font: inherit;
+  touch-action: manipulation;
+}
+
+.candidate.focus {
+  border-color: #c9b6e6;
+}
+
+.candidate.selected {
+  border-color: #c01060;
+  background: #fff0f6;
+}
+
+.candidate-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 10px;
+  border-radius: 50%;
+  background: #ff7aa8;
+  color: #fff;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.candidate-stats {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+#select-start {
+  min-width: 160px;
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: #6a4cff;
+  color: #fff;
+  font-size: 18px;
+}
+
+#select-start:disabled {
+  background: #cfc6e6;
+  color: #f5f0ff;
+}
