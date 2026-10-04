@@ -57,6 +57,8 @@ export interface Params {
     /** ワールド全体での中立個体の上限(スポーンするときの上限) */
     maxCount: number;
   };
+  /** 拠点。容量は同行中のファミリアも含めた総数。回復は遠征中のみ、一定間隔ごとに最大HPの一定割合 */
+  base: { capacity: number; regenInterval: number; regenRatio: number; summonMinHpRatio: number };
   /** 同行できる人数の上限(拠点にいる者は含めない)と、雇用ボタンの距離。将来はレリックや親密度の平均で増える */
   party: { maxAides: number; maxFamiliars: number; hireRange: number };
   /** 素手。武器ごとの固定値(攻撃間隔は将来、実効数値になる) */
@@ -130,6 +132,10 @@ export const PARAM_META: ParamMeta[] = [
   { path: "enemy.wanderDistMin", label: "敵 徘徊の歩く距離 最小", min: 0, max: 400, step: 5 },
   { path: "enemy.wanderDistMax", label: "敵 徘徊の歩く距離 最大", min: 0, max: 400, step: 5 },
   { path: "neutral.maxCount", label: "中立個体のスポーン上限", min: 0, max: 40, step: 1 },
+  { path: "base.capacity", label: "拠点の容量(同行中も含む)", min: 1, max: 60, step: 1 },
+  { path: "base.regenInterval", label: "拠点の回復間隔(秒)", min: 1, max: 60, step: 1 },
+  { path: "base.regenRatio", label: "拠点の回復量(最大HPの割合)", min: 0.001, max: 0.2, step: 0.001 },
+  { path: "base.summonMinHpRatio", label: "召喚できるHP割合", min: 0, max: 1, step: 0.05 },
   { path: "party.maxFamiliars", label: "ファミリアの人数上限", min: 1, max: 20, step: 1 },
   { path: "party.maxAides", label: "側近の人数上限", min: 1, max: 10, step: 1 },
   { path: "party.hireRange", label: "雇用ボタンの距離", min: 20, max: 300, step: 2 },

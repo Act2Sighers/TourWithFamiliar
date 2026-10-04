@@ -11,8 +11,11 @@ import { World } from "./world";
  */
 export type GameMode = "select" | "world" | "overlay" | "dialog" | "ended";
 
-/** hire=雇用の確認 / full=人数上限で雇えない(OKのみ) */
-export type DialogState = { kind: "hire"; neutralId: number } | { kind: "full" };
+/**
+ * hire=雇用の確認 / full=雇えない通知(OKのみ)。
+ * 雇えない理由: party=同行の人数の上限 / base=拠点の容量(同行中も含む)
+ */
+export type DialogState = { kind: "hire"; neutralId: number } | { kind: "full"; reason: "party" | "base" };
 
 const NO_INPUT: MoveInput = { moveX: 0, moveY: 0, interact: false };
 
@@ -83,7 +86,8 @@ export class Game {
   private tryOpenHireDialog(): boolean {
     const t = this.world.interactionTarget();
     if (!t || t.kind !== "hire") return false;
-    this.dialog = this.world.canAddFamiliar("companion") ? { kind: "hire", neutralId: t.neutral.id } : { kind: "full" };
+    const block = this.world.familiarAddBlock("companion");
+    this.dialog = block === null ? { kind: "hire", neutralId: t.neutral.id } : { kind: "full", reason: block };
     this.mode = "dialog";
     return true;
   }

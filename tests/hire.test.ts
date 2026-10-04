@@ -160,7 +160,7 @@ describe("人数上限", () => {
     const n = nearNeutral(w, 30);
     g.step(dt, press);
     expect(g.mode).toBe("dialog");
-    expect(g.dialog).toEqual({ kind: "full" });
+    expect(g.dialog).toEqual({ kind: "full", reason: "party" });
     g.confirmDialog(); // OK
     expect(g.mode).toBe("world");
     expect(w.neutrals).toContain(n);
@@ -169,7 +169,7 @@ describe("人数上限", () => {
   it("拠点にいるファミリアは、人数に数えない", () => {
     const { g, w, p } = quietGame();
     while (w.familiars.length < p.party.maxFamiliars) w.spawnFamiliar("companion");
-    w.base.push(w.familiars.pop()!); // 1人を拠点へ
+    w.base.receive(w.familiars.pop()!, p); // 1人を拠点へ
     nearNeutral(w, 30);
     g.step(dt, press);
     expect(g.dialog?.kind).toBe("hire");

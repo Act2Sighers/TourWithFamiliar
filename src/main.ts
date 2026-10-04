@@ -48,6 +48,8 @@ const panel = new DebugPanel(
     onDebugDamage: (target, amount) => game.world.debugDamage(target, amount),
     onDebugHealAll: () => game.world.debugHealAll(),
     onDebugSpawnCompanion: () => game.world.debugSpawnCompanion(),
+    onDebugDispatch: () => game.world.debugDispatch(),
+    onDebugSummon: () => game.world.debugSummon(),
     onDebugSpawnNeutral: () => game.world.debugSpawnNeutral(),
     onDebugSpawnEnemy: () => game.world.debugSpawnEnemy(),
     onDebugSendFamiliarAway: () => game.world.debugSendFamiliarAway(),
@@ -89,7 +91,10 @@ function familiarStats(): Record<string, string> {
       : `${f.state}${f.lost ? "/lost" : ""}/${f.wander.mode}`;
     out[`fam${f.id}`] = `${f.role} ${status} hp ${f.hp}/${f.maxHp} dist ${d.toFixed(0)} spd ${Math.hypot(f.vx, f.vy).toFixed(0)}`;
   }
-  if (w.base.length > 0) out.base = `${w.base.length}体`;
+  if (w.base.size > 0) {
+    const cap = params.base.capacity;
+    out.base = `${w.base.size}体 (総数 ${w.totalFamiliars()}/${cap}) ` + w.base.members.map((b) => `${b.role === "aide" ? "側" : "同"}${Math.round((b.hp / b.maxHp) * 100)}%`).join(" ");
+  }
   return out;
 }
 
@@ -164,7 +169,7 @@ let prevNav = 0;
 let shownDialog: string | null = null;
 function syncDialog(): void {
   const d = game.dialog;
-  const key = d ? d.kind : null;
+  const key = d ? (d.kind === "full" ? `full:${d.reason}` : d.kind) : null;
   if (key === shownDialog) return;
   shownDialog = key;
   dialogEl.hidden = d === null;
@@ -175,7 +180,7 @@ function syncDialog(): void {
     dialogNo.hidden = false;
     dialogHint.textContent = "Enter / A: はい　Esc / B: いいえ";
   } else {
-    dialogMessage.textContent = "これ以上同行できません";
+    dialogMessage.textContent = d.reason === "base" ? "拠点がいっぱいで、雇用できません" : "これ以上同行できません";
     dialogYes.textContent = "OK";
     dialogNo.hidden = true;
     dialogHint.textContent = "Enter / A / Esc / B: 閉じる";

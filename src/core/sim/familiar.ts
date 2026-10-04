@@ -177,6 +177,21 @@ export function reviveFamiliar(f: Familiar, p: Params): void {
   startIdle(f, p);
 }
 
+/**
+ * フィールドでの一時的な状態を消して、待機に戻す。拠点へ送られたとき・拠点から召喚されたときに使う。
+ * HP・能力値・役割など、個体のデータは変えない。
+ */
+export function resetFieldState(f: Familiar, p: Params): void {
+  clearDown(f);
+  f.state = "standby";
+  f.targetId = null;
+  f.lost = false;
+  f.vx = 0;
+  f.vy = 0;
+  resetCombat(f.combat);
+  startIdle(f, p);
+}
+
 function stepStandby(f: Familiar, world: World, dt: number): void {
   const p = world.params;
   const watcher = world.watcher;

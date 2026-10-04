@@ -119,7 +119,7 @@ describe("送還", () => {
     expect(c.vanishing).toBe(true);
     run(w, 0.4);
     expect(w.familiars).not.toContain(c);
-    expect(w.base).toContain(c);
+    expect(w.base.members).toContain(c);
   });
   it("同行者は、助け起こしの対象にならない", () => {
     const w = new World(1, createDefaultParams());
@@ -140,7 +140,7 @@ describe("送還", () => {
     w.step(dt, idle);
     damage(a, 9999);
     run(w, 2);
-    expect(w.base).toContain(a);
+    expect(w.base.members).toContain(a);
     expect(w.familiars).not.toContain(a);
   });
   it("存在範囲の外で倒れた側近でも、最後の1人なら送還されず残る", () => {

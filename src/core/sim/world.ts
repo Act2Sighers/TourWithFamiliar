@@ -2,6 +2,7 @@
 import type { MoveInput } from "../input";
 import type { Params } from "../params";
 import { Rng, hash2 } from "../rng";
+import { Base } from "./base";
 import { ChunkMap } from "./chunks";
 import { WATCHER_NAME, createBody, damage, distance, halt, isDown, setMaxHp, stepMotion, type Body } from "./body";
 import { resolveCollisions } from "./collision";
@@ -10,6 +11,7 @@ import { createEnemy, enemyAbilities, stepEnemy, type Enemy } from "./enemy";
 import { createNeutral, neutralAbilities, stepNeutral, type Neutral } from "./neutral";
 import {
   createFamiliar,
+  resetFieldState,
   familiarAbilities,
   familiarFromNeutral,
   reviveFamiliar,
@@ -31,14 +33,16 @@ export type InteractionTarget =
   | { kind: "hire"; neutral: Neutral };
 
 const WATCHER_ID = 0;
+/** 召喚されたファミリアの出現位置は、待機範囲のこの割合の内側(待機中の目的地と同じ)。 */
+const SUMMON_REACH = 0.9;
 
 export class World {
   tick = 0;
   time = 0;
   readonly watcher: Watcher;
   familiars: Familiar[] = [];
-  /** 拠点へ送還されたファミリア(M1cでは保管するだけ。回復も召喚もまだ無い) */
-  readonly base: Familiar[] = [];
+  /** 拠点(送還されたファミリアを預かる。遠征中は、HPがゆっくり回復する) */
+  readonly base = new Base();
   enemies: Enemy[] = [];
   neutrals: Neutral[] = [];
   readonly chunks: ChunkMap;
@@ -168,11 +172,77 @@ export class World {
     return best;
   }
 
-  /** ファミリアを1人増やせるか。人数上限は同行中のファミリア(拠点にいる者は含めない)と、そのうちの側近について。 */
-  canAddFamiliar(role: FamiliarRole): boolean {
+  /** 持っているファミリアの総数(同行中 + 拠点)。 */
+  totalFamiliars(): number {
+    return this.familiars.length + this.base.size;
+  }
+
+  /** 同行の人数に空きがあるか。上限は、同行中のファミリア(拠点にいる者は含めない)と、そのうちの側近について。 */
+  partyHasRoom(role: FamiliarRole): boolean {
     const p = this.params.party;
     if (this.familiars.length >= p.maxFamiliars) return false;
     if (role === "aide" && this.familiars.filter((f) => f.role === "aide").length >= p.maxAides) return false;
+    return true;
+  }
+
+  /** 拠点の容量に空きがあるか。容量は、同行中のファミリアも含めた総数で数える。 */
+  baseHasRoom(): boolean {
+    return this.totalFamiliars() < this.params.base.capacity;
+  }
+
+  /**
+   * ファミリアを新しく1人増やせない理由(雇用など)。増やせるなら null。
+   * party=同行の人数の上限 / base=拠点の容量(同行中も含む)。
+   * 送還は総数が変わらないので、拠点の容量には引っかからない。
+   */
+  familiarAddBlock(role: FamiliarRole): "party" | "base" | null {
+    if (!this.partyHasRoom(role)) return "party";
+    if (!this.baseHasRoom()) return "base";
+    return null;
+  }
+
+  canAddFamiliar(role: FamiliarRole): boolean {
+    return this.familiarAddBlock(role) === null;
+  }
+
+  /**
+   * 拠点から召喚する。HPなど個体のデータは、拠点にいたときのまま引き継ぐ。
+   * 出現位置は、観測者の待機範囲の内側。
+   * - not_found: 拠点にいない / low_hp: HPが足りず拒否 / party_full: 同行の人数の上限
+   */
+  summonFromBase(id: number): "ok" | "not_found" | "low_hp" | "party_full" {
+    const f = this.base.find(id);
+    if (!f) return "not_found";
+    if (!this.base.canSummon(f, this.params)) return "low_hp";
+    if (!this.partyHasRoom(f.role)) return "party_full";
+    this.base.take(f);
+    const rng = new Rng(hash2(this.seed, 0x5c, (id * 31 + this.tick) | 0));
+    const r = this.params.familiar.standbyRange * SUMMON_REACH * Math.sqrt(rng.next());
+    const a = rng.range(0, Math.PI * 2);
+    f.x = f.prevX = this.watcher.x + Math.cos(a) * r;
+    f.y = f.prevY = this.watcher.y + Math.sin(a) * r;
+    resetFieldState(f, this.params);
+    this.familiars.push(f);
+    return "ok";
+  }
+
+  /**
+   * 同行中のファミリアを、自分の意思で拠点へ送還できるか。
+   * 観測者と共に、少なくとも1人のファミリアと、少なくとも1人の側近が、いなければならない。
+   */
+  canDispatch(f: Familiar): boolean {
+    if (!this.familiars.includes(f)) return false;
+    if (this.familiars.length <= 1) return false;
+    if (f.role === "aide" && this.familiars.filter((o) => o.role === "aide").length <= 1) return false;
+    return true;
+  }
+
+  /** 同行中のファミリアを拠点へ送還する。総数が変わらないので、容量には引っかからない。 */
+  dispatchToBase(id: number): boolean {
+    const f = this.familiars.find((o) => o.id === id);
+    if (!f || !this.canDispatch(f)) return false;
+    this.familiars = this.familiars.filter((o) => o !== f);
+    this.base.receive(f, this.params);
     return true;
   }
 
@@ -234,6 +304,18 @@ export class World {
     this.spawnFamiliar("companion");
   }
 
+  /** 同行中のファミリアのうち、送還できる最初の1人を拠点へ送る。 */
+  debugDispatch(): void {
+    const f = this.familiars.find((o) => this.canDispatch(o));
+    if (f) this.dispatchToBase(f.id);
+  }
+
+  /** 拠点にいるファミリアのうち、召喚できる最初の1人を召喚する。 */
+  debugSummon(): void {
+    const f = this.base.members.find((o) => this.base.canSummon(o, this.params));
+    if (f) this.summonFromBase(f.id);
+  }
+
   /** 観測者の少し離れた位置に中立個体を1体出す。 */
   debugSpawnNeutral(): void {
     const a = 1 + this.neutrals.length * 2.4;
@@ -291,6 +373,7 @@ export class World {
     for (const f of this.familiars) stepFamiliar(f, this, dt);
     this.stepRevive(dt, input.interact ?? false);
     this.sendVanishedToBase();
+    this.base.step(dt, p, false); // 遠征中: 拠点のファミリアが、ゆっくり回復する
     for (const e of this.enemies) stepEnemy(e, this, dt);
     for (const n of this.neutrals) stepNeutral(n, this, dt);
 
@@ -330,7 +413,7 @@ export class World {
     if (!this.familiars.some((f) => f.vanishing && f.downTimer >= delay)) return;
     const keep: Familiar[] = [];
     for (const f of this.familiars) {
-      if (f.vanishing && f.downTimer >= delay) this.base.push(f);
+      if (f.vanishing && f.downTimer >= delay) this.base.receive(f, this.params);
       else keep.push(f);
     }
     this.familiars = keep;
