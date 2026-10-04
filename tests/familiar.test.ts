@@ -12,13 +12,13 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.
 describe("能力値 → 実効数値", () => {
   it("丈夫さから最大HP、素早さから移動速度が決まる", () => {
     const p = createDefaultParams();
-    expect(maxHpOf({ toughness: 10, agility: 1 }, p)).toBe(10 * p.stats.hpPerToughness);
-    expect(moveSpeedOf({ toughness: 1, agility: 10 }, p)).toBe(10 * p.stats.speedPerAgility);
-    expect(moveSpeedOf({ toughness: 1, agility: 20 }, p)).toBeGreaterThan(moveSpeedOf({ toughness: 1, agility: 10 }, p));
+    expect(maxHpOf({ toughness: 10, attack: 1, agility: 1 }, p)).toBe(10 * p.stats.hpPerToughness);
+    expect(moveSpeedOf({ toughness: 1, attack: 1, agility: 10 }, p)).toBe(10 * p.stats.speedPerAgility);
+    expect(moveSpeedOf({ toughness: 1, attack: 1, agility: 20 }, p)).toBeGreaterThan(moveSpeedOf({ toughness: 1, attack: 1, agility: 10 }, p));
   });
   it("初期のファミリアは観測者と同じか、わずかに遅い", () => {
     const p = createDefaultParams();
-    const fam = moveSpeedOf({ toughness: p.familiar.toughness, agility: p.familiar.agility }, p);
+    const fam = moveSpeedOf({ toughness: p.familiar.toughness, attack: p.familiar.attack, agility: p.familiar.agility }, p);
     expect(fam).toBeLessThanOrEqual(p.watcher.maxSpeed);
     expect(fam).toBeGreaterThanOrEqual(p.watcher.maxSpeed * 0.8);
   });
@@ -32,15 +32,15 @@ describe("HPゲージの表示規則", () => {
     expect(shouldShowHpBar(1, 100)).toBe(true);
   });
   it("ダメージはHPを0未満にしない", () => {
-    const b = createBody(0, 0, 10, 30);
+    const b = createBody(1, 0, 0, 10, 30);
     damage(b, 100);
     expect(b.hp).toBe(0);
   });
   it("最大HPの変更: 全快なら全快のまま追従し、そうでなければ上限に収める", () => {
-    const full = createBody(0, 0, 10, 100);
+    const full = createBody(1, 0, 0, 10, 100);
     setMaxHp(full, 150);
     expect(full.hp).toBe(150);
-    const hurt = createBody(0, 0, 10, 100);
+    const hurt = createBody(1, 0, 0, 10, 100);
     damage(hurt, 20);
     setMaxHp(hurt, 150);
     expect(hurt.hp).toBe(80);
@@ -51,7 +51,7 @@ describe("HPゲージの表示規則", () => {
 
 describe("慣性", () => {
   it("目標速度に瞬時には達せず、加速度に従って近づく", () => {
-    const b = createBody(0, 0, 10, 10);
+    const b = createBody(1, 0, 0, 10, 10);
     stepMotion(b, 100, 0, true, 600, 600, dt);
     expect(b.vx).toBeCloseTo(10);
     for (let i = 0; i < 60; i++) stepMotion(b, 100, 0, true, 600, 600, dt);

@@ -15,6 +15,8 @@ export interface PanelHooks {
   onResetWorld(seed: number): void;
   onDebugDamage(target: "watcher" | "familiar", amount: number): void;
   onDebugHealAll(): void;
+  onDebugSpawnEnemy(): void;
+  onDebugSendFamiliarAway(): void;
   getStats(): Record<string, string>;
 }
 
@@ -61,6 +63,8 @@ export class DebugPanel {
       button("観測者 -10HP", () => this.hooks.onDebugDamage("watcher", 10)),
       button("ファミリア -10HP", () => this.hooks.onDebugDamage("familiar", 10)),
       button("全員回復", () => this.hooks.onDebugHealAll()),
+      button("敵を1体出す", () => this.hooks.onDebugSpawnEnemy()),
+      button("ファミリアを存在範囲の外へ", () => this.hooks.onDebugSendFamiliarAway()),
     );
     body.append(hpRow);
 

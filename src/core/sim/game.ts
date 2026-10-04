@@ -16,10 +16,11 @@ export class Game {
     this.world = this.createWorld(seed);
   }
 
-  /** 最初の側近を1人連れた状態で始める(側近の選択UIは後で作る)。 */
+  /** 最初の側近を1人連れ、周囲に敵が数体いる状態で始める(側近の選択UIや敵の出現の仕組みは後で作る)。 */
   private createWorld(seed: number): World {
     const world = new World(seed, this.params);
     world.spawnFamiliar("aide");
+    world.spawnInitialEnemies();
     return world;
   }
 
@@ -41,6 +42,6 @@ export class Game {
 
   onParamChanged(path: string): void {
     if (path.startsWith("world.")) this.world.chunks.clear();
-    if (path === "familiar.toughness" || path === "familiar.agility") this.world.applyTemplateAbilities();
+    if (/^(familiar|enemy)\.(toughness|attack|agility)$/.test(path)) this.world.applyTemplateAbilities();
   }
 }

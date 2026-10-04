@@ -34,6 +34,8 @@ const panel = new DebugPanel(
     onParamChanged: (path) => game.onParamChanged(path),
     onDebugDamage: (target, amount) => game.world.debugDamage(target, amount),
     onDebugHealAll: () => game.world.debugHealAll(),
+    onDebugSpawnEnemy: () => game.world.debugSpawnEnemy(),
+    onDebugSendFamiliarAway: () => game.world.debugSendFamiliarAway(),
     onResetWorld: (seed) => {
       game.reset(seed);
       stepper.reset();
@@ -50,6 +52,7 @@ const panel = new DebugPanel(
         speed: Math.hypot(w.watcher.vx, w.watcher.vy).toFixed(0),
         hp: `${w.watcher.hp}/${w.watcher.maxHp}`,
         ...familiarStats(),
+        enemies: enemySummary(),
         chunks: String(w.chunks.count),
         fps: fps.toFixed(0),
       };
@@ -63,9 +66,15 @@ function familiarStats(): Record<string, string> {
   const w = game.world;
   for (const f of w.familiars) {
     const d = Math.hypot(f.x - w.watcher.x, f.y - w.watcher.y);
-    out[`fam${f.id}`] = `${f.role} ${f.state}/${f.wander.mode} hp ${f.hp}/${f.maxHp} dist ${d.toFixed(0)} spd ${Math.hypot(f.vx, f.vy).toFixed(0)}`;
+    out[`fam${f.id}`] = `${f.role} ${f.state}${f.lost ? "/lost" : ""}/${f.wander.mode} hp ${f.hp}/${f.maxHp} dist ${d.toFixed(0)} spd ${Math.hypot(f.vx, f.vy).toFixed(0)}`;
   }
   return out;
+}
+
+function enemySummary(): string {
+  const es = game.world.enemies;
+  const engaged = es.filter((e) => e.state === "engaged").length;
+  return `${es.length} (臨戦 ${engaged})`;
 }
 
 function syncOverlay(): void {

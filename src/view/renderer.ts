@@ -1,6 +1,8 @@
 import type { Params } from "../core/params";
 import type { Decor } from "../core/sim/chunks";
 import { shouldShowHpBar, type Body } from "../core/sim/body";
+import { attackArea, weaponOf, type Fighter } from "../core/sim/combat";
+import type { Enemy } from "../core/sim/enemy";
 import type { World } from "../core/sim/world";
 
 /** 画面の短辺がこの長さ(ワールド単位)に見える状態を zoom=1 とする。端末が違っても見える範囲を揃えるため。 */
@@ -57,8 +59,17 @@ export class Renderer {
     this.drawGrid(left, right, top, bottom, scale);
     this.drawChunks(world, left, right, top, bottom);
     if (this.params.view.showStandbyRange >= 0.5) this.drawStandbyRange(camX, camY);
-    for (const f of world.familiars) this.drawCharacter(f, alpha, "#ff7aa8");
-    this.drawCharacter(wt, alpha, "#6a4cff");
+    if (this.params.view.showAttackAreas >= 0.5) {
+      for (const f of world.familiars) this.drawAttackArea(f);
+      for (const e of world.enemies) this.drawAttackArea(e);
+    }
+    for (const e of world.enemies) this.drawEnemy(e, alpha);
+    for (const f of world.familiars) {
+      const color = f.hp <= 0 ? "#c9b6bf" : f.lost ? "#e6a3bd" : "#ff7aa8";
+      this.drawCharacter(f, alpha, color, f.state === "intercept");
+    }
+    this.drawCharacter(wt, alpha, wt.hp <= 0 ? "#b9b0d9" : "#6a4cff", false);
+    for (const e of world.enemies) this.drawHpBar(e, alpha);
     for (const f of world.familiars) this.drawHpBar(f, alpha);
     this.drawHpBar(wt, alpha);
 
@@ -143,7 +154,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawCharacter(b: Body, alpha: number, color: string): void {
+  private drawCharacter(b: Body, alpha: number, color: string, ring: boolean): void {
     const ctx = this.ctx;
     const x = b.prevX + (b.x - b.prevX) * alpha;
     const y = b.prevY + (b.y - b.prevY) * alpha;
@@ -152,10 +163,54 @@ export class Renderer {
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
+    if (ring) {
+      // 迎撃中の目印
+      ctx.strokeStyle = "#c01060";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
     ctx.fillStyle = "#ffffff";
     ctx.beginPath();
     ctx.arc(x + Math.cos(b.facing) * r * 0.55, y + Math.sin(b.facing) * r * 0.55, r * 0.28, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  /** 敵: 正三角形。向いている方向に角の1つが来る。徘徊は淡い色、臨戦は濃い色。 */
+  private drawEnemy(e: Enemy, alpha: number): void {
+    const ctx = this.ctx;
+    const x = e.prevX + (e.x - e.prevX) * alpha;
+    const y = e.prevY + (e.y - e.prevY) * alpha;
+    ctx.fillStyle = e.state === "engaged" ? "#e0303c" : "#d98a8f";
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const a = e.facing + (i * Math.PI * 2) / 3;
+      const px = x + Math.cos(a) * e.radius;
+      const py = y + Math.sin(a) * e.radius;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  /** 攻撃範囲。前隙の間は輪郭だけ、持続の間は塗りつぶす。 */
+  private drawAttackArea(f: Fighter): void {
+    const c = f.combat;
+    if (c.phase === "ready" || f.hp <= 0) return;
+    const a = attackArea(f, c, weaponOf(f.weaponId, this.params));
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+    if (c.phase === "active") {
+      ctx.fillStyle = "rgba(255, 60, 60, 0.45)";
+      ctx.fill();
+    } else {
+      ctx.setLineDash(c.phase === "windup" ? [4, 4] : [2, 6]);
+      ctx.strokeStyle = c.phase === "windup" ? "rgba(255, 60, 60, 0.8)" : "rgba(120, 120, 120, 0.4)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
   }
 
   /** HPゲージ。全快のときとHP0のときは描かない(共通規則)。 */

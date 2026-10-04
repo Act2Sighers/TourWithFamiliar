@@ -1,21 +1,35 @@
-// C#: Familiar / FamiliarBrain(待機AI。迎撃はM1bで追加する)
+// C#: Familiar / FamiliarBrain(待機 ⇄ 迎撃。存在範囲の外では迷子速度で観測者へ戻る)
 import type { Params } from "../params";
 import { Rng, hash2 } from "../rng";
-import { createBody, stepMotion, type Body } from "./body";
+import { createBody, distance, halt, isDown, setMaxHp, steerToward } from "./body";
+import {
+  createCombat,
+  isBusy,
+  resetCombat,
+  startAttackDistance,
+  stepCombat,
+  tryStartAttack,
+  weaponOf,
+  type Fighter,
+} from "./combat";
+import { engageRangeOf } from "./ranges";
 import { maxHpOf, moveSpeedOf, type Abilities } from "./stats";
+import type { World } from "./world";
 
 /** aide=側近 / companion=同行者 */
 export type FamiliarRole = "aide" | "companion";
-/** standby=待機。迎撃(intercept)はM1bで追加 */
-export type FamiliarState = "standby";
+/** standby=待機 / intercept=迎撃 */
+export type FamiliarState = "standby" | "intercept";
 /** 待機中の細かい動作。return=待機範囲へ戻る途中 / idle=立ち止まる / walk=待機範囲内を歩く */
 export type WanderMode = "return" | "idle" | "walk";
 
-export interface Familiar extends Body {
-  id: number;
+export interface Familiar extends Fighter {
   role: FamiliarRole;
-  abilities: Abilities;
   state: FamiliarState;
+  /** 迎撃中の相手(敵)。待機中は null */
+  targetId: number | null;
+  /** 存在範囲の外にいる。ワールドが毎ステップ更新する */
+  lost: boolean;
   wander: { mode: WanderMode; timer: number; tx: number; ty: number };
   rng: Rng;
 }
@@ -27,46 +41,101 @@ const WALK_REACH = 0.9;
 /** 目的地に着いたとみなす距離。 */
 const ARRIVE = 6;
 
-export function createFamiliar(
-  id: number,
-  role: FamiliarRole,
-  x: number,
-  y: number,
-  seed: number,
-  abilities: Abilities,
-  p: Params,
-): Familiar {
-  const b = createBody(x, y, p.familiar.radius, maxHpOf(abilities, p));
+export function familiarAbilities(p: Params): Abilities {
+  return { toughness: p.familiar.toughness, attack: p.familiar.attack, agility: p.familiar.agility };
+}
+
+export function createFamiliar(id: number, role: FamiliarRole, x: number, y: number, seed: number, p: Params): Familiar {
+  const abilities = familiarAbilities(p);
   return {
-    ...b,
-    id,
-    role,
+    ...createBody(id, x, y, p.familiar.radius, maxHpOf(abilities, p)),
     abilities,
+    weaponId: "unarmed",
+    combat: createCombat(),
+    role,
     state: "standby",
+    targetId: null,
+    lost: false,
     wander: { mode: "idle", timer: 0, tx: x, ty: y },
     rng: new Rng(hash2(seed, 0xfa, id)),
   };
 }
 
-export function stepFamiliar(f: Familiar, watcher: Body, p: Params, dt: number): void {
+export function stepFamiliar(f: Familiar, world: World, dt: number): void {
+  const p = world.params;
+  const w = world.watcher;
+  const weapon = weaponOf(f.weaponId, p);
+  f.radius = p.familiar.radius;
+  setMaxHp(f, maxHpOf(f.abilities, p));
+
+  // HP0: 行動せず、攻撃対象にもならない(戦闘不能の詳細はM1c)
+  if (isDown(f)) {
+    f.state = "standby";
+    f.targetId = null;
+    resetCombat(f.combat);
+    halt(f, p.familiar.friction, dt);
+    return;
+  }
+
+  const busy = isBusy(f.combat);
+
+  // 状態遷移
+  if (f.lost) {
+    f.state = "standby";
+    f.targetId = null;
+  } else if (f.state === "standby") {
+    const e = world.nearestEngagedEnemy(f.x, f.y);
+    if (e) {
+      f.state = "intercept";
+      f.targetId = e.id;
+    }
+  }
+  if (f.state === "intercept") {
+    const e = f.targetId === null ? undefined : world.enemyById(f.targetId);
+    if (!e || isDown(e) || (e.state !== "engaged" && distance(e, w) > engageRangeOf(p))) {
+      f.state = "standby";
+      f.targetId = null;
+    }
+  }
+
+  // 行動
+  if (busy) {
+    halt(f, p.familiar.friction, dt);
+  } else if (f.state === "intercept") {
+    const e = world.enemyById(f.targetId!)!;
+    if (distance(f, e) <= startAttackDistance(weapon, e.radius)) {
+      f.facing = Math.atan2(e.y - f.y, e.x - f.x);
+      halt(f, p.familiar.friction, dt);
+      tryStartAttack(f.combat, weapon, f.facing);
+    } else {
+      steerToward(f, e.x, e.y, moveSpeedOf(f.abilities, p), p.familiar.accel, p.familiar.friction, dt);
+    }
+  } else {
+    stepStandby(f, world, dt);
+  }
+  stepCombat(f.combat, weapon, dt);
+}
+
+function stepStandby(f: Familiar, world: World, dt: number): void {
+  const p = world.params;
+  const watcher = world.watcher;
   const range = p.familiar.standbyRange;
   const w = f.wander;
-  const dist = Math.hypot(watcher.x - f.x, watcher.y - f.y);
+  const dist = distance(f, watcher);
+  const normalSpeed = moveSpeedOf(f.abilities, p);
 
   if (w.mode !== "return" && dist > range) w.mode = "return";
 
-  let tx = f.x;
-  let ty = f.y;
-  let moving = false;
-  let speedRatio = 1;
+  let target: { x: number; y: number } | null = null;
+  let speed = normalSpeed;
 
   if (w.mode === "return") {
     if (dist <= range * RETURN_RESUME) {
       startIdle(f, p);
     } else {
-      tx = watcher.x;
-      ty = watcher.y;
-      moving = true;
+      target = watcher;
+      // 存在範囲の外では強制的に迷子速度。観測者が止まっていても戻れるよう、本来の速度を下限にする(暫定)
+      if (f.lost) speed = Math.max(p.familiar.lostSpeedRatio * Math.hypot(watcher.vx, watcher.vy), normalSpeed);
     }
   }
 
@@ -81,27 +150,13 @@ export function stepFamiliar(f: Familiar, watcher: Body, p: Params, dt: number):
     if (Math.hypot(w.tx - f.x, w.ty - f.y) <= ARRIVE) {
       startIdle(f, p);
     } else {
-      tx = w.tx;
-      ty = w.ty;
-      moving = true;
-      speedRatio = p.familiar.wanderSpeedRatio;
+      target = { x: w.tx, y: w.ty };
+      speed = normalSpeed * p.familiar.wanderSpeedRatio;
     }
   }
 
-  let tvx = 0;
-  let tvy = 0;
-  if (moving) {
-    const dx = tx - f.x;
-    const dy = ty - f.y;
-    const len = Math.hypot(dx, dy);
-    if (len > 0) {
-      const speed = moveSpeedOf(f.abilities, p) * speedRatio;
-      tvx = (dx / len) * speed;
-      tvy = (dy / len) * speed;
-      f.facing = Math.atan2(dy, dx);
-    }
-  }
-  stepMotion(f, tvx, tvy, moving, p.familiar.accel, p.familiar.friction, dt);
+  if (target) steerToward(f, target.x, target.y, speed, p.familiar.accel, p.familiar.friction, dt);
+  else halt(f, p.familiar.friction, dt);
 }
 
 function startIdle(f: Familiar, p: Params): void {
@@ -109,7 +164,7 @@ function startIdle(f: Familiar, p: Params): void {
   f.wander.timer = f.rng.range(p.familiar.idleMin, Math.max(p.familiar.idleMin, p.familiar.idleMax));
 }
 
-function startWalk(f: Familiar, watcher: Body, p: Params): void {
+function startWalk(f: Familiar, watcher: { x: number; y: number }, p: Params): void {
   const r = p.familiar.standbyRange * WALK_REACH * Math.sqrt(f.rng.next());
   const a = f.rng.range(0, Math.PI * 2);
   f.wander.mode = "walk";
