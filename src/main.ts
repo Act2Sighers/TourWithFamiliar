@@ -32,6 +32,8 @@ const panel = new DebugPanel(
   params,
   {
     onParamChanged: (path) => game.onParamChanged(path),
+    onDebugDamage: (target, amount) => game.world.debugDamage(target, amount),
+    onDebugHealAll: () => game.world.debugHealAll(),
     onResetWorld: (seed) => {
       game.reset(seed);
       stepper.reset();
@@ -46,6 +48,8 @@ const panel = new DebugPanel(
         time: `${w.time.toFixed(1)}s`,
         pos: `${w.watcher.x.toFixed(0)}, ${w.watcher.y.toFixed(0)}`,
         speed: Math.hypot(w.watcher.vx, w.watcher.vy).toFixed(0),
+        hp: `${w.watcher.hp}/${w.watcher.maxHp}`,
+        ...familiarStats(),
         chunks: String(w.chunks.count),
         fps: fps.toFixed(0),
       };
@@ -53,6 +57,16 @@ const panel = new DebugPanel(
   },
   initialSeed,
 );
+
+function familiarStats(): Record<string, string> {
+  const out: Record<string, string> = {};
+  const w = game.world;
+  for (const f of w.familiars) {
+    const d = Math.hypot(f.x - w.watcher.x, f.y - w.watcher.y);
+    out[`fam${f.id}`] = `${f.role} ${f.state}/${f.wander.mode} hp ${f.hp}/${f.maxHp} dist ${d.toFixed(0)} spd ${Math.hypot(f.vx, f.vy).toFixed(0)}`;
+  }
+  return out;
+}
 
 function syncOverlay(): void {
   overlayEl.hidden = game.mode !== "overlay";

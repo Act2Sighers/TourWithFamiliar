@@ -13,7 +13,14 @@ export class Game {
     public seed: number,
     private params: Params,
   ) {
-    this.world = new World(seed, params);
+    this.world = this.createWorld(seed);
+  }
+
+  /** 最初の側近を1人連れた状態で始める(側近の選択UIは後で作る)。 */
+  private createWorld(seed: number): World {
+    const world = new World(seed, this.params);
+    world.spawnFamiliar("aide");
+    return world;
   }
 
   /** ワールド時間を進める。オーバーレイ中は完全に停止する(急かさない方針)。 */
@@ -28,11 +35,12 @@ export class Game {
 
   reset(seed: number): void {
     this.seed = seed;
-    this.world = new World(seed, this.params);
+    this.world = this.createWorld(seed);
     this.mode = "world";
   }
 
   onParamChanged(path: string): void {
     if (path.startsWith("world.")) this.world.chunks.clear();
+    if (path === "familiar.toughness" || path === "familiar.agility") this.world.applyTemplateAbilities();
   }
 }

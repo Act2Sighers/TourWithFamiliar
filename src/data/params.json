@@ -1,7 +1,19 @@
 {
   "sim": { "hz": 60 },
   "world": { "chunkSize": 512, "decorPerChunk": 10, "keepRadius": 4 },
-  "watcher": { "radius": 14, "maxSpeed": 90, "accel": 1400, "friction": 1800 },
-  "view": { "zoom": 1, "showChunkBorders": 1, "decorOpacity": 0.5 },
+  "watcher": { "radius": 14, "maxHp": 100, "maxSpeed": 90, "accel": 1400, "friction": 1800 },
+  "stats": { "hpPerToughness": 10, "speedPerAgility": 8.5 },
+  "familiar": {
+    "toughness": 10,
+    "agility": 10,
+    "radius": 12,
+    "accel": 1200,
+    "friction": 1600,
+    "standbyRange": 120,
+    "wanderSpeedRatio": 0.6,
+    "idleMin": 1,
+    "idleMax": 3
+  },
+  "view": { "zoom": 1, "showChunkBorders": 1, "decorOpacity": 0.5, "showStandbyRange": 1 },
   "input": { "deadzone": 0 }
 }

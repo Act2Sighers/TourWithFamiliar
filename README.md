@@ -3,6 +3,7 @@
 プレイヤーが「ファミリア」を世話し、ファミリアがプレイヤーに代わって戦う、リアルタイム・ローグライト・シミュレーションゲームのプロトタイプ。
 
 - 設計: [docs/PROTOTYPE_DESIGN.md](docs/PROTOTYPE_DESIGN.md)
+- ファミリア・戦闘の仕様: [docs/SPEC_FAMILIAR_COMBAT.md](docs/SPEC_FAMILIAR_COMBAT.md)
 - 技術: TypeScript + Vite + Canvas 2D(最終的にUnity C#へ移植する前提)
 
 ## 動かし方

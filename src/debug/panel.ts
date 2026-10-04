@@ -13,6 +13,8 @@ export interface DebugControls {
 export interface PanelHooks {
   onParamChanged(path: string): void;
   onResetWorld(seed: number): void;
+  onDebugDamage(target: "watcher" | "familiar", amount: number): void;
+  onDebugHealAll(): void;
   getStats(): Record<string, string>;
 }
 
@@ -52,6 +54,15 @@ export class DebugPanel {
       this.controls.timeScale = v;
     });
     body.append(slow);
+
+    // HP確認用(HPゲージの動作確認)
+    const hpRow = el("div", "dbg-row");
+    hpRow.append(
+      button("観測者 -10HP", () => this.hooks.onDebugDamage("watcher", 10)),
+      button("ファミリア -10HP", () => this.hooks.onDebugDamage("familiar", 10)),
+      button("全員回復", () => this.hooks.onDebugHealAll()),
+    );
+    body.append(hpRow);
 
     // シード
     const seedRow = el("div", "dbg-row");

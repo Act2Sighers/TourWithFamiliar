@@ -1,5 +1,6 @@
 import type { Params } from "../core/params";
 import type { Decor } from "../core/sim/chunks";
+import { shouldShowHpBar, type Body } from "../core/sim/body";
 import type { World } from "../core/sim/world";
 
 /** 画面の短辺がこの長さ(ワールド単位)に見える状態を zoom=1 とする。端末が違っても見える範囲を揃えるため。 */
@@ -55,7 +56,11 @@ export class Renderer {
 
     this.drawGrid(left, right, top, bottom, scale);
     this.drawChunks(world, left, right, top, bottom);
-    this.drawWatcher(camX, camY, wt.facing);
+    if (this.params.view.showStandbyRange >= 0.5) this.drawStandbyRange(camX, camY);
+    for (const f of world.familiars) this.drawCharacter(f, alpha, "#ff7aa8");
+    this.drawCharacter(wt, alpha, "#6a4cff");
+    for (const f of world.familiars) this.drawHpBar(f, alpha);
+    this.drawHpBar(wt, alpha);
 
     ctx.restore();
   }
@@ -125,16 +130,48 @@ export class Renderer {
     ctx.fill();
   }
 
-  private drawWatcher(x: number, y: number, facing: number): void {
+  /** 待機範囲(観測者を中心とした円)。調整用の表示。 */
+  private drawStandbyRange(cx: number, cy: number): void {
     const ctx = this.ctx;
-    const r = this.params.watcher.radius;
-    ctx.fillStyle = "#6a4cff";
+    ctx.save();
+    ctx.setLineDash([8, 8]);
+    ctx.strokeStyle = "rgba(255, 122, 168, 0.55)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, this.params.familiar.standbyRange, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawCharacter(b: Body, alpha: number, color: string): void {
+    const ctx = this.ctx;
+    const x = b.prevX + (b.x - b.prevX) * alpha;
+    const y = b.prevY + (b.y - b.prevY) * alpha;
+    const r = b.radius;
+    ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#ffffff";
     ctx.beginPath();
-    ctx.arc(x + Math.cos(facing) * r * 0.55, y + Math.sin(facing) * r * 0.55, r * 0.28, 0, Math.PI * 2);
+    ctx.arc(x + Math.cos(b.facing) * r * 0.55, y + Math.sin(b.facing) * r * 0.55, r * 0.28, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  /** HPゲージ。全快のときとHP0のときは描かない(共通規則)。 */
+  private drawHpBar(b: Body, alpha: number): void {
+    if (!shouldShowHpBar(b.hp, b.maxHp)) return;
+    const ctx = this.ctx;
+    const x = b.prevX + (b.x - b.prevX) * alpha;
+    const y = b.prevY + (b.y - b.prevY) * alpha;
+    const w = Math.max(24, b.radius * 2.4);
+    const h = 5;
+    const left = x - w / 2;
+    const top = y - b.radius - 12;
+    const ratio = b.hp / b.maxHp;
+    ctx.fillStyle = "rgba(60, 30, 50, 0.65)";
+    ctx.fillRect(left - 1, top - 1, w + 2, h + 2);
+    ctx.fillStyle = `hsl(${Math.round(ratio * 120)} 75% 48%)`;
+    ctx.fillRect(left, top, w * ratio, h);
   }
 }
