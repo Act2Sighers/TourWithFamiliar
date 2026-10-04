@@ -1,0 +1,7 @@
+{
+  "sim": { "hz": 60 },
+  "world": { "chunkSize": 512, "decorPerChunk": 14, "keepRadius": 4 },
+  "watcher": { "radius": 14, "maxSpeed": 220, "accel": 1400, "friction": 1800 },
+  "view": { "zoom": 1, "showChunkBorders": 0 },
+  "input": { "deadzone": 0.15 }
+}
