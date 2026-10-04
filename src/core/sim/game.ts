@@ -6,24 +6,26 @@ import { Base } from "./base";
 import { isDown } from "./body";
 import { DEFAULT_KIND_ID, kindById } from "./kinds";
 import { checkParty } from "./party";
+import { performTalkAction, type TalkActionId } from "./talk";
 import { World } from "./world";
 
 /**
  * select=最初の側近を選んでいる(そのセーブデータで最初の遠征の前だけ)
  * base=拠点(メニューだけの画面。いずれ、観測者が歩ける有限な空間にする)
  * party=遠征に連れ出すファミリアを選んでいる
- * world=遠征中 / overlay=メニュー表示中 / dialog=確認ダイアログ表示中
+ * world=遠征中 / overlay=メニュー表示中 / summon=メニューから、拠点のファミリアを召喚する一覧を開いている / dialog=ダイアログ表示中
  * ended=観測者が倒れて、遠征のワールドが止まった
  * select・base・party・overlay・dialog・ended の間は、ワールドの時間は完全に停止する(急かさない方針)。
  */
-export type GameMode = "select" | "base" | "party" | "world" | "overlay" | "dialog" | "ended";
+export type GameMode = "select" | "base" | "party" | "world" | "overlay" | "summon" | "dialog" | "ended";
 
 /**
  * hire=雇用の確認 / full=雇えない通知(OKのみ。理由: party=同行の人数の上限 / base=拠点の容量) /
- * abort=遠征の中断の確認
+ * abort=遠征の中断の確認 / talk=ファミリアに話しかけたときの、行動を選ぶダイアログ
  */
 export type DialogState =
   | { kind: "hire"; neutralId: number }
+  | { kind: "talk"; familiarId: number }
   | { kind: "full"; reason: "party" | "base" }
   | { kind: "abort" };
 
@@ -167,10 +169,10 @@ export class Game {
     const defeated = this.defeatTimer !== null;
     const inp = defeated ? NO_INPUT : input;
 
-    // インタラクトボタンを押した瞬間に、対象が雇用なら確認ダイアログを出す(助け起こしは押し続ける操作なので対象外)
+    // インタラクトボタンを押した瞬間に、対象が雇用・話しかけるなら、ダイアログを出す(助け起こしは押し続ける操作なので対象外)
     const pressed = !!inp.interact && !this.prevInteract;
     this.prevInteract = !!inp.interact;
-    if (pressed && this.tryOpenHireDialog()) return;
+    if (pressed && this.tryOpenInteractDialog()) return;
 
     this.world.step(dt, inp);
     if (!defeated) {
@@ -181,20 +183,60 @@ export class Game {
     if (this.defeatTimer! >= this.params.run.defeatWait) this.mode = "ended";
   }
 
-  private tryOpenHireDialog(): boolean {
+  private tryOpenInteractDialog(): boolean {
     const t = this.world.interactionTarget();
-    if (!t || t.kind !== "hire") return false;
-    const block = this.world.familiarAddBlock("companion");
-    this.dialog = block === null ? { kind: "hire", neutralId: t.neutral.id } : { kind: "full", reason: block };
+    if (!t || t.kind === "revive") return false;
+    if (t.kind === "talk") {
+      this.dialog = { kind: "talk", familiarId: t.familiar.id };
+    } else {
+      const block = this.world.familiarAddBlock("companion");
+      this.dialog = block === null ? { kind: "hire", neutralId: t.neutral.id } : { kind: "full", reason: block };
+    }
     this.dialogReturn = "world";
     this.mode = "dialog";
     return true;
+  }
+
+  /**
+   * 話しかけたファミリアに対する行動を実行する(「送還する」「側近にする/同行者にする」)。
+   * 実行できたらダイアログを閉じて遠征に戻る。選べない行動なら、何もしない。
+   */
+  chooseTalkAction(id: TalkActionId): boolean {
+    if (this.mode !== "dialog" || !this.dialog || this.dialog.kind !== "talk") return false;
+    const d = this.dialog;
+    const f = this.world.familiars.find((o) => o.id === d.familiarId);
+    if (!f || !performTalkAction(this.world, f, id)) return false;
+    this.closeDialog();
+    return true;
+  }
+
+  // ---- 遠征中のメニューからの召喚 ----
+
+  /** メニューの「召喚」。拠点のファミリアの一覧を開く。 */
+  openSummon(): boolean {
+    if (this.mode !== "overlay") return false;
+    this.mode = "summon";
+    return true;
+  }
+
+  /** 召喚の一覧を閉じて、メニューに戻る。 */
+  closeSummon(): void {
+    if (this.mode === "summon") this.mode = "overlay";
+  }
+
+  /** 一覧から召喚する。召喚できたら、メニューを閉じて遠征に戻る(出現する様子が見える)。 */
+  summonFromMenu(id: number): ReturnType<World["summonFromBase"]> {
+    if (this.mode !== "summon") return "not_found";
+    const r = this.world.summonFromBase(id);
+    if (r === "ok") this.mode = "world";
+    return r;
   }
 
   /** ダイアログの「はい」(通知では「OK」)。 */
   confirmDialog(): void {
     if (this.mode !== "dialog" || !this.dialog) return;
     const d = this.dialog;
+    if (d.kind === "talk") return; // 話しかけるは、行動を選ぶダイアログ(chooseTalkAction)で閉じる
     if (d.kind === "abort") {
       this.endExpedition();
       return;
@@ -219,6 +261,7 @@ export class Game {
   handleMenuButton(): void {
     if (this.mode === "dialog") this.cancelDialog();
     else if (this.mode === "party") this.cancelParty();
+    else if (this.mode === "summon") this.closeSummon();
     else this.toggleOverlay();
   }
 

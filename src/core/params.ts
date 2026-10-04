@@ -58,9 +58,18 @@ export interface Params {
     maxCount: number;
   };
   /** 拠点。容量は同行中のファミリアも含めた総数。回復は遠征中のみ、一定間隔ごとに最大HPの一定割合 */
-  base: { capacity: number; regenInterval: number; regenRatio: number; summonMinHpRatio: number };
+  base: {
+    capacity: number;
+    regenInterval: number;
+    regenRatio: number;
+    summonMinHpRatio: number;
+    /** 拠点に送られたとき、HPがこの割合(最大HPに対して)以下なら、この割合まで回復する */
+    arrivalMinHpRatio: number;
+    /** 1にすると、召喚できるのは側近だけ(暫定の仕様) */
+    summonAideOnly: number;
+  };
   /** 同行できる人数の上限(拠点にいる者は含めない)と、雇用ボタンの距離。将来はレリックや親密度の平均で増える */
-  party: { maxAides: number; maxFamiliars: number; hireRange: number };
+  party: { maxAides: number; maxFamiliars: number; hireRange: number; talkRange: number };
   /** 素手。武器ごとの固定値(攻撃間隔は将来、実効数値になる) */
   unarmed: {
     baseDamage: number;
@@ -138,6 +147,9 @@ export const PARAM_META: ParamMeta[] = [
   { path: "base.summonMinHpRatio", label: "召喚できるHP割合", min: 0, max: 1, step: 0.05 },
   { path: "party.maxFamiliars", label: "ファミリアの人数上限", min: 1, max: 20, step: 1 },
   { path: "party.maxAides", label: "側近の人数上限", min: 1, max: 10, step: 1 },
+  { path: "base.arrivalMinHpRatio", label: "拠点に着いたときの最低HP割合", min: 0, max: 0.5, step: 0.01 },
+  { path: "base.summonAideOnly", label: "召喚できるのは側近のみ(0/1)", min: 0, max: 1, step: 1 },
+  { path: "party.talkRange", label: "話しかけるボタンの距離", min: 20, max: 300, step: 2 },
   { path: "party.hireRange", label: "雇用ボタンの距離", min: 20, max: 300, step: 2 },
   { path: "neutral.toughness", label: "中立個体 丈夫さ", min: 1, max: 100, step: 1 },
   { path: "neutral.attack", label: "中立個体 攻撃力", min: 1, max: 100, step: 1 },

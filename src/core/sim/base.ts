@@ -35,9 +35,15 @@ export class Base {
     return this.entries.find((e) => e.familiar.id === id)?.familiar;
   }
 
-  /** ファミリアを預かる。フィールドでの状態(戦闘不能・迎撃など)は消える。HPは変わらない。 */
+  /**
+   * ファミリアを預かる。フィールドでの状態(戦闘不能・迎撃など)は消える。
+   * HPが最大HPの一定割合(初期値5%)以下(0を含む)なら、その割合まで、直後に回復する。それ以外は変わらない。
+   */
   receive(f: Familiar, p: Params): void {
     resetFieldState(f, p);
+    f.maxHp = maxHpOf(f.abilities, p);
+    const floor = Math.max(1, Math.round(f.maxHp * p.base.arrivalMinHpRatio));
+    if (f.hp <= floor) f.hp = floor;
     this.entries.push({ familiar: f, timer: 0 });
   }
 

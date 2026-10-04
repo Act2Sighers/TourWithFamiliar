@@ -50,8 +50,15 @@
     "spawnMax": 600,
     "maxCount": 10
   },
-  "base": { "capacity": 20, "regenInterval": 10, "regenRatio": 0.01, "summonMinHpRatio": 0.5 },
-  "party": { "maxAides": 2, "maxFamiliars": 5, "hireRange": 72 },
+  "base": {
+    "capacity": 20,
+    "regenInterval": 10,
+    "regenRatio": 0.01,
+    "summonMinHpRatio": 0.5,
+    "arrivalMinHpRatio": 0.05,
+    "summonAideOnly": 1
+  },
+  "party": { "maxAides": 2, "maxFamiliars": 5, "hireRange": 72, "talkRange": 72 },
   "unarmed": {
     "baseDamage": 10,
     "windup": 0.25,

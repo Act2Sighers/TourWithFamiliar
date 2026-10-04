@@ -35,7 +35,7 @@ describe("雇用の対象", () => {
     const n = nearNeutral(w, p.party.hireRange - 5);
     expect(w.interactionTarget()).toEqual({ kind: "hire", neutral: n });
     n.x = n.prevX = p.party.hireRange + 40;
-    expect(w.interactionTarget()).toBeNull();
+    expect(w.interactionTarget()?.kind).not.toBe("hire"); // 近くのファミリアには、話しかけられる
   });
   it("最も近い中立個体が対象になる", () => {
     const { w } = quietGame();
@@ -47,7 +47,7 @@ describe("雇用の対象", () => {
     const { w } = quietGame();
     const n = nearNeutral(w, 40);
     damage(n, 9999);
-    expect(w.interactionTarget()).toBeNull();
+    expect(w.interactionTarget()?.kind).not.toBe("hire"); // 雇用はできない(近くのファミリアには、話しかけられる)
   });
   it("優先順位は 助け起こし > 雇用", () => {
     const { w } = quietGame();

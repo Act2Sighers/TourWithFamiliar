@@ -32,6 +32,25 @@
       </div>
     </div>
 
+    <div id="talk-dialog" hidden>
+      <div class="dialog-card">
+        <p id="talk-title"></p>
+        <div id="talk-actions"></div>
+        <p class="hint" id="talk-note"></p>
+        <p class="hint">↑ ↓ で選ぶ　Enter / A で決定　Esc / B で閉じる</p>
+      </div>
+    </div>
+
+    <div id="summon-screen" hidden>
+      <div class="select-panel">
+        <h1>召喚するファミリアを選んでください</h1>
+        <div id="summon-list" class="member-list"></div>
+        <p id="summon-note"></p>
+        <button id="summon-back" type="button">戻る</button>
+        <p class="hint">← → で移動、Enter / A で召喚　Esc / B で戻る<br />召喚できるのは側近だけです(HPが最大HPの50%以上のとき)</p>
+      </div>
+    </div>
+
     <div id="select" hidden>
       <div class="select-panel">
         <h1>最初の側近を選んでください</h1>
@@ -70,6 +89,7 @@
         <h1>メニュー</h1>
         <p>ワールドの時間は止まっています</p>
         <button id="btn-resume" type="button">再開</button>
+        <button id="btn-summon" type="button" class="secondary">召喚</button>
         <button id="btn-abort" type="button" class="secondary">拠点に戻る</button>
         <p class="hint">Esc / P / ゲームパッドStart / ☰ で開閉</p>
       </div>

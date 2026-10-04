@@ -81,36 +81,82 @@ describe("拠点の容量", () => {
   });
 });
 
+describe("拠点に送られたときのHP", () => {
+  const send = (hp: number) => {
+    const { w, cs } = party(1);
+    const c = cs[0]!;
+    c.hp = hp;
+    w.dispatchToBase(c.id);
+    return c;
+  };
+  it("最大HPの5%以下(0を含む)で送られたら、直後に最大HPの5%まで回復する", () => {
+    expect(send(0).hp).toBe(5);
+    expect(send(3).hp).toBe(5);
+    expect(send(5).hp).toBe(5);
+  });
+  it("5%より上なら、HPは変わらない", () => {
+    expect(send(6).hp).toBe(6);
+    expect(send(80).hp).toBe(80);
+  });
+  it("強制送還(戦闘不能の同行者)でも、同じ", () => {
+    const { w, cs } = party(1);
+    const c = cs[0]!;
+    damage(c, 9999);
+    run(w, 2);
+    expect(w.base.members).toContain(c);
+    expect(c.hp).toBe(5);
+  });
+  it("遠征が終わって拠点に戻るときも、同じ(HP0の側近が、遠征に出られなくなるのを防ぐ)", () => {
+    const g = new Game(1, createDefaultParams());
+    const aide = g.world.familiars[0]!;
+    aide.hp = 0;
+    g.toggleOverlay();
+    g.requestAbort();
+    g.confirmDialog();
+    expect(g.mode).toBe("base");
+    expect(aide.hp).toBe(5);
+  });
+  it("割合は調整できる", () => {
+    const p = createDefaultParams();
+    p.base.arrivalMinHpRatio = 0.2;
+    const { w, cs } = party(1, p);
+    const c = cs[0]!;
+    c.hp = 0;
+    w.dispatchToBase(c.id);
+    expect(c.hp).toBe(20);
+  });
+});
+
 describe("拠点での回復", () => {
   it("遠征中は、10秒ごとに最大HPの1%ずつ回復する(離散的)", () => {
     const { w, p, cs } = party(1);
     const c = cs[0]!;
-    c.hp = 0;
+    c.hp = 20;
     w.dispatchToBase(c.id);
     run(w, 9.9);
-    expect(c.hp).toBe(0);
+    expect(c.hp).toBe(20);
     run(w, 0.2);
-    expect(c.hp).toBe(Math.round(c.maxHp * p.base.regenRatio)); // 1%
+    expect(c.hp).toBe(20 + Math.round(c.maxHp * p.base.regenRatio)); // +1%
     run(w, 10);
-    expect(c.hp).toBe(2 * Math.round(c.maxHp * p.base.regenRatio));
+    expect(c.hp).toBe(20 + 2 * Math.round(c.maxHp * p.base.regenRatio));
   });
-  it("50%以上に回復するには、8分以上かかる", () => {
+  it("HP0で送られた者が、50%以上になるまで、7分半(450秒)かかる(5%から45%分)", () => {
     const { w, cs } = party(1);
     const c = cs[0]!;
     c.hp = 0;
-    w.dispatchToBase(c.id);
-    run(w, 60 * 8 - 5);
+    w.dispatchToBase(c.id); // 5%になる
+    run(w, 440);
     expect(c.hp).toBeLessThan(c.maxHp / 2);
-    run(w, 60);
+    run(w, 20);
     expect(c.hp).toBeGreaterThanOrEqual(c.maxHp / 2);
   });
   it("観測者が拠点にいる間は、自動回復しない", () => {
     const { w, p, cs } = party(1);
     const c = cs[0]!;
-    c.hp = 0;
+    c.hp = 20;
     w.dispatchToBase(c.id);
     for (let i = 0; i < 60 * 60; i++) w.base.step(dt, p, true);
-    expect(c.hp).toBe(0);
+    expect(c.hp).toBe(20);
   });
   it("全快したら、それ以上は増えない。最大HPを超えない", () => {
     const { w, cs } = party(1);
@@ -124,106 +170,130 @@ describe("拠点での回復", () => {
     const { w, cs } = party(2);
     const a = cs[0]!;
     const b = cs[1]!;
-    a.hp = 0;
-    b.hp = 0;
+    a.hp = 20;
+    b.hp = 20;
     w.dispatchToBase(a.id);
     run(w, 6);
     w.dispatchToBase(b.id);
     run(w, 5); // a は11秒、b は5秒
-    expect(a.hp).toBeGreaterThan(0);
-    expect(b.hp).toBe(0);
+    expect(a.hp).toBeGreaterThan(20);
+    expect(b.hp).toBe(20);
     run(w, 5); // b は10秒
-    expect(b.hp).toBeGreaterThan(0);
+    expect(b.hp).toBeGreaterThan(20);
   });
   it("遠征が一時停止している間(ワールドが進まない間)は、回復しない", () => {
     const g = new Game(1, createDefaultParams());
     g.world.enemies.length = 0;
     g.world.neutrals.length = 0;
     const c = g.world.spawnFamiliar("companion");
-    c.hp = 0;
+    c.hp = 20;
     g.world.dispatchToBase(c.id);
     g.toggleOverlay();
     for (let i = 0; i < 60 * 60; i++) g.step(dt, idle);
-    expect(c.hp).toBe(0);
+    expect(c.hp).toBe(20);
   });
 });
 
+/** 側近2人 + 同行者1人。最初の側近を拠点に送った状態にして返す(召喚の対象にできる側近) */
+function awayAide(p: Params = createDefaultParams()) {
+  const ctx = party(1, p);
+  ctx.w.spawnFamiliar("aide"); // 側近をもう1人(これで、最初の側近を送還できる)
+  expect(ctx.w.dispatchToBase(ctx.aide.id)).toBe(true);
+  return ctx;
+}
+
 describe("召喚", () => {
-  it("HPが最大HPの50%未満の間は、召喚を拒否する。50%以上なら召喚できる", () => {
+  it("召喚できるのは側近だけ(暫定)。同行者は、HPが足りていても召喚できない", () => {
     const { w, cs } = party(1);
     const c = cs[0]!;
-    c.hp = Math.round(c.maxHp * 0.5) - 1;
     w.dispatchToBase(c.id);
-    expect(w.summonFromBase(c.id)).toBe("low_hp");
+    c.hp = c.maxHp;
+    expect(w.summonFromBase(c.id)).toBe("not_aide");
     expect(w.base.members).toContain(c);
-    c.hp = Math.round(c.maxHp * 0.5);
+  });
+  it("「側近のみ」は調整できる(0にすれば、同行者も召喚できる)", () => {
+    const p = createDefaultParams();
+    p.base.summonAideOnly = 0;
+    const { w, cs } = party(1, p);
+    const c = cs[0]!;
+    w.dispatchToBase(c.id);
+    c.hp = c.maxHp;
     expect(w.summonFromBase(c.id)).toBe("ok");
-    expect(w.base.members).not.toContain(c);
-    expect(w.familiars).toContain(c);
+  });
+  it("側近でも、HPが最大HPの50%未満の間は、召喚を拒否する。50%以上なら召喚できる", () => {
+    const { w, aide } = awayAide();
+    aide.hp = Math.round(aide.maxHp * 0.5) - 1;
+    expect(w.summonFromBase(aide.id)).toBe("low_hp");
+    expect(w.base.members).toContain(aide);
+    aide.hp = Math.round(aide.maxHp * 0.5);
+    expect(w.summonFromBase(aide.id)).toBe("ok");
+    expect(w.base.members).not.toContain(aide);
+    expect(w.familiars).toContain(aide);
+  });
+  it("召喚できない理由は、側近でない → HP → 人数の順に報告する", () => {
+    const { w, cs } = party(1);
+    const c = cs[0]!;
+    c.hp = 10;
+    w.dispatchToBase(c.id);
+    expect(w.summonBlock(c)).toBe("not_aide");
   });
   it("召喚されたファミリアは、拠点にいたときのHPを引き継ぎ、待機範囲の内側に現れる", () => {
-    const { w, p, cs } = party(1);
-    const c = cs[0]!;
-    c.hp = Math.round(c.maxHp * 0.7);
-    const hp = c.hp;
-    w.dispatchToBase(c.id);
+    const { w, p, aide } = awayAide();
+    aide.hp = Math.round(aide.maxHp * 0.7);
+    const hp = aide.hp;
     w.watcher.x = w.watcher.prevX = 5000;
     w.watcher.y = w.watcher.prevY = -3000;
-    expect(w.summonFromBase(c.id)).toBe("ok");
-    expect(c.hp).toBe(hp);
-    expect(Math.hypot(c.x - w.watcher.x, c.y - w.watcher.y)).toBeLessThanOrEqual(p.familiar.standbyRange);
-    expect(c.state).toBe("standby");
-    expect(c.down).toBe(false);
+    expect(w.summonFromBase(aide.id)).toBe("ok");
+    expect(aide.hp).toBe(hp);
+    expect(Math.hypot(aide.x - w.watcher.x, aide.y - w.watcher.y)).toBeLessThanOrEqual(p.familiar.standbyRange);
+    expect(aide.state).toBe("standby");
+    expect(aide.down).toBe(false);
   });
   it("出現位置は、シードと状況が同じなら同じ(決定的)", () => {
     const pos = () => {
-      const { w, cs } = party(1);
-      const c = cs[0]!;
-      w.dispatchToBase(c.id);
+      const { w, aide } = awayAide();
+      aide.hp = aide.maxHp;
       run(w, 3);
-      w.summonFromBase(c.id);
-      return [c.x, c.y];
+      w.summonFromBase(aide.id);
+      return [aide.x, aide.y];
     };
     expect(pos()).toEqual(pos());
   });
   it("役割は変わらない(側近は側近のまま戻る)", () => {
-    const { w, aide } = party(1);
-    w.spawnFamiliar("aide"); // 側近をもう1人。これで、最初の側近を送還できる
-    expect(w.dispatchToBase(aide.id)).toBe(true);
-    expect(w.summonFromBase(aide.id)).toBe("ok");
+    const { w, aide } = awayAide();
+    aide.hp = aide.maxHp;
+    w.summonFromBase(aide.id);
     expect(aide.role).toBe("aide");
     expect(w.familiars.filter((f) => f.role === "aide")).toHaveLength(2);
   });
-  it("側近の上限(2人)に達していたら、側近は召喚できない(同行者の召喚には影響しない)", () => {
-    const { w, aide } = party(1);
-    const a2 = w.spawnFamiliar("aide");
-    w.dispatchToBase(aide.id);
-    w.spawnFamiliar("aide"); // 側近が2人に戻る(a2 + 新しい1人)
+  it("側近の上限(2人)に達していたら、側近は召喚できず、拠点に残る", () => {
+    const { w, aide } = awayAide();
+    aide.hp = aide.maxHp;
+    w.spawnFamiliar("aide"); // 側近が2人に戻る
     expect(w.partyHasRoom("aide")).toBe(false);
     expect(w.summonFromBase(aide.id)).toBe("party_full");
     expect(w.base.members).toContain(aide);
-    void a2;
+  });
+  it("同行の人数が上限なら、召喚できず、拠点に残る", () => {
+    const { w, p, aide } = awayAide();
+    aide.hp = aide.maxHp;
+    while (w.familiars.length < p.party.maxFamiliars) w.spawnFamiliar("companion");
+    expect(w.summonFromBase(aide.id)).toBe("party_full");
   });
   it("拠点にいない者は召喚できない", () => {
     const { w } = party(1);
     expect(w.summonFromBase(999)).toBe("not_found");
   });
-  it("同行の人数が上限なら、召喚できず、拠点に残る", () => {
-    const { w, p, cs } = party(1);
-    const c = cs[0]!;
-    w.dispatchToBase(c.id);
-    while (w.familiars.length < p.party.maxFamiliars) w.spawnFamiliar("companion");
-    expect(w.summonFromBase(c.id)).toBe("party_full");
-    expect(w.base.members).toContain(c);
-  });
   it("召喚されると、戦闘不能などの状態は残らない", () => {
-    const { w, cs } = party(1);
+    const p = createDefaultParams();
+    p.base.summonAideOnly = 0; // 同行者でも召喚できるようにして、戦闘不能からの流れを確かめる
+    const { w, cs } = party(1, p);
     const c = cs[0]!;
     damage(c, 9999);
     run(w, 2); // 戦闘不能 → 同行者なので拠点へ
     expect(w.base.members).toContain(c);
     c.hp = Math.round(c.maxHp * 0.6);
-    w.summonFromBase(c.id);
+    expect(w.summonFromBase(c.id)).toBe("ok");
     run(w, 0.5);
     expect(c.down).toBe(false);
     expect(c.vanishing).toBe(false);

@@ -25,12 +25,13 @@ import { attackPowerOf } from "./stats";
 export type Watcher = Body;
 
 /**
- * インタラクトボタンの対象。優先順位は 助け起こし > 雇用。
- * 助け起こしはボタンを押し続ける操作、雇用は押した瞬間に確認ダイアログが出る操作。
+ * インタラクトボタンの対象。優先順位は 助け起こし > 雇用 > 話しかける。(話しかけるが最も低い)
+ * 助け起こしはボタンを押し続ける操作、雇用と話しかけるは、押した瞬間にダイアログが出る操作。
  */
 export type InteractionTarget =
   | { kind: "revive"; familiar: Familiar }
-  | { kind: "hire"; neutral: Neutral };
+  | { kind: "hire"; neutral: Neutral }
+  | { kind: "talk"; familiar: Familiar };
 
 const WATCHER_ID = 0;
 /** 召喚されたファミリアの出現位置は、待機範囲のこの割合の内側(待機中の目的地と同じ)。 */
@@ -218,15 +219,25 @@ export class World {
   }
 
   /**
-   * 拠点から召喚する。HPなど個体のデータは、拠点にいたときのまま引き継ぐ。
-   * 出現位置は、観測者の待機範囲の内側。
-   * - not_found: 拠点にいない / low_hp: HPが足りず拒否 / party_full: 同行の人数の上限
+   * 拠点のファミリアを召喚できない理由。召喚できるなら null。
+   * not_aide=側近ではない(※暫定: 召喚できるのは側近だけ) / low_hp=HPが足りない / party_full=同行の人数の上限
    */
-  summonFromBase(id: number): "ok" | "not_found" | "low_hp" | "party_full" {
-    const f = this.base.find(id);
-    if (!f) return "not_found";
+  summonBlock(f: Familiar): "not_aide" | "low_hp" | "party_full" | null {
+    if (this.params.base.summonAideOnly >= 0.5 && f.role !== "aide") return "not_aide";
     if (!this.base.canSummon(f, this.params)) return "low_hp";
     if (!this.partyHasRoom(f.role)) return "party_full";
+    return null;
+  }
+
+  /**
+   * 拠点から召喚する。HPなど個体のデータは、拠点にいたときのまま引き継ぐ。
+   * 出現位置は、観測者の待機範囲の内側。
+   */
+  summonFromBase(id: number): "ok" | "not_found" | "not_aide" | "low_hp" | "party_full" {
+    const f = this.base.find(id);
+    if (!f) return "not_found";
+    const block = this.summonBlock(f);
+    if (block) return block;
     this.base.take(f);
     const rng = new Rng(hash2(this.seed, 0x5c, (id * 31 + this.tick) | 0));
     const r = this.params.familiar.standbyRange * SUMMON_REACH * Math.sqrt(rng.next());
@@ -246,6 +257,27 @@ export class World {
     if (!this.familiars.includes(f)) return false;
     if (this.familiars.length <= 1) return false;
     if (f.role === "aide" && this.familiars.filter((o) => o.role === "aide").length <= 1) return false;
+    return true;
+  }
+
+  /**
+   * 同行中のファミリアの役割(側近 ⇄ 同行者)を変えられない理由。変えられるなら null。
+   * 側近の人数の上限を超えられない。観測者と共に、少なくとも1人の側近がいなければならない。
+   */
+  roleChangeBlock(f: Familiar, role: FamiliarRole): "same" | "aide_limit" | "last_aide" | "not_with_party" | null {
+    if (!this.familiars.includes(f)) return "not_with_party";
+    if (f.role === role) return "same";
+    const aides = this.familiars.filter((o) => o.role === "aide").length;
+    if (role === "aide" && aides >= this.params.party.maxAides) return "aide_limit";
+    if (role === "companion" && aides <= 1) return "last_aide";
+    return null;
+  }
+
+  /** 同行中のファミリアを、側近にする/同行者にする。条件を満たさなければ何もしない。 */
+  setRole(id: number, role: FamiliarRole): boolean {
+    const f = this.familiars.find((o) => o.id === id);
+    if (!f || this.roleChangeBlock(f, role) !== null) return false;
+    f.role = role;
     return true;
   }
 
@@ -287,7 +319,19 @@ export class World {
         hire = n;
       }
     }
-    return hire ? { kind: "hire", neutral: hire } : null;
+    if (hire) return { kind: "hire", neutral: hire };
+    // 話しかける: 戦闘不能でない同行中のファミリアのうち、最も近い者
+    let talk: Familiar | null = null;
+    let talkD = this.params.party.talkRange;
+    for (const f of this.familiars) {
+      if (f.down) continue;
+      const d = distance(f, w);
+      if (d <= talkD) {
+        talkD = d;
+        talk = f;
+      }
+    }
+    return talk ? { kind: "talk", familiar: talk } : null;
   }
 
   /** 雇用する: 中立個体を同行者(ファミリア)にする。人数上限や状態の条件を満たさなければ何もしない。 */

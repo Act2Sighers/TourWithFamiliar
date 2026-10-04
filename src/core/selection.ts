@@ -42,3 +42,9 @@ export class CandidateSelection {
     return this.selected !== null;
   }
 }
+
+/** 一覧のカーソルを、端で反対側へ回しながら動かす。件数が0なら 0 を返す。 */
+export function wrapFocus(index: number, dir: -1 | 1, count: number): number {
+  if (count <= 0) return 0;
+  return (index + dir + count) % count;
+}

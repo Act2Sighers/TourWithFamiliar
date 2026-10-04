@@ -1,10 +1,11 @@
 import "./style.css";
 import { createDefaultParams } from "./core/params";
-import { CandidateSelection } from "./core/selection";
+import { CandidateSelection, wrapFocus } from "./core/selection";
 import { Game } from "./core/sim/game";
 import type { Familiar } from "./core/sim/familiar";
 import { FAMILIAR_KINDS } from "./core/sim/kinds";
 import { PARTY_REASON_TEXT, PartySelection, checkParty } from "./core/sim/party";
+import { talkActionsOf, type TalkAction, type TalkActionId, type TalkBlock } from "./core/sim/talk";
 import { FixedStepper } from "./core/stepper";
 import { DebugPanel } from "./debug/panel";
 import { GamepadInput } from "./input/gamepad";
@@ -42,6 +43,15 @@ const partyInfo = document.getElementById("party-info") as HTMLElement;
 const partyGo = document.getElementById("party-go") as HTMLButtonElement;
 const partyBack = document.getElementById("party-back") as HTMLElement;
 const toBaseBtn = document.getElementById("btn-to-base") as HTMLElement;
+const summonBtn = document.getElementById("btn-summon") as HTMLElement;
+const talkEl = document.getElementById("talk-dialog") as HTMLElement;
+const talkTitle = document.getElementById("talk-title") as HTMLElement;
+const talkActionsEl = document.getElementById("talk-actions") as HTMLElement;
+const talkNote = document.getElementById("talk-note") as HTMLElement;
+const summonEl = document.getElementById("summon-screen") as HTMLElement;
+const summonList = document.getElementById("summon-list") as HTMLElement;
+const summonNote = document.getElementById("summon-note") as HTMLElement;
+const summonBack = document.getElementById("summon-back") as HTMLElement;
 
 const initialSeed = 12345;
 const game = new Game(initialSeed, params, { autoStart: false });
@@ -269,6 +279,130 @@ abortBtn.addEventListener("click", () => {
   }
 });
 
+// ---- 話しかける(行動を選ぶダイアログ) ----
+
+const TALK_LABEL: Record<TalkActionId, string> = { dispatch: "送還する", promote: "側近にする", demote: "同行者にする" };
+function talkBlockText(id: TalkActionId, block: TalkBlock): string {
+  if (block === "last_familiar") return "最後のファミリアは送還できません";
+  if (block === "aide_limit") return "側近の人数が上限です";
+  return id === "dispatch" ? "最後の側近は送還できません" : "最後の側近は同行者にできません";
+}
+
+let talkFocus = 0;
+let talkShown = false;
+/** 直近に描いた内容の目印。変わっていなければ描き直さない(毎フレーム作り直すと、クリックを取りこぼすため) */
+let talkSig = "";
+
+/** 話しかけるダイアログ: 行動のボタンと、選べない理由を、いまの状態に合わせて描く。 */
+function renderTalk(): void {
+  const d = game.dialog;
+  const f = d && d.kind === "talk" ? game.world.familiars.find((o) => o.id === d.familiarId) : undefined;
+  talkEl.hidden = !f;
+  if (!f) return;
+  const actions = talkActionsOf(game.world, f);
+  talkFocus = Math.min(talkFocus, actions.length); // 最後の1つは「やめる」
+  const sig = `${f.id}|${f.role}|${talkFocus}|${actions.map((a) => `${a.id}:${a.enabled}`).join(",")}`;
+  if (sig === talkSig && !talkEl.hidden) return;
+  talkSig = sig;
+  talkTitle.textContent = `${f.name}(${f.role === "aide" ? "側近" : "同行者"})に話しかけています`;
+  talkActionsEl.innerHTML = "";
+  actions.forEach((a, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = TALK_LABEL[a.id];
+    b.disabled = !a.enabled;
+    if (talkFocus === i) b.classList.add("focus");
+    b.addEventListener("click", () => chooseTalk(a));
+    talkActionsEl.append(b);
+  });
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "cancel";
+  cancel.textContent = "やめる";
+  if (talkFocus === actions.length) cancel.classList.add("focus");
+  cancel.addEventListener("click", cancelDialog);
+  talkActionsEl.append(cancel);
+  const focused = actions[talkFocus];
+  talkNote.textContent = focused && !focused.enabled && focused.block ? talkBlockText(focused.id, focused.block) : "";
+}
+
+function chooseTalk(a: TalkAction): void {
+  if (!a.enabled) return;
+  if (game.chooseTalkAction(a.id)) {
+    stepper.reset();
+    talkFocus = 0;
+    renderTalk();
+  }
+}
+
+// ---- 召喚(メニューから) ----
+
+let summonFocus = 0;
+const SUMMON_BLOCK_TEXT = {
+  not_aide: "召喚できるのは側近だけです",
+  low_hp: "HPが足りません",
+  party_full: "同行の人数が上限です",
+} as const;
+
+/** 召喚の一覧: 拠点にいるファミリアを並べ、召喚できない者は、理由つきで薄く表示する。 */
+function renderSummon(): void {
+  summonEl.hidden = game.mode !== "summon";
+  if (game.mode !== "summon") return;
+  const members = game.base.members;
+  summonFocus = Math.min(summonFocus, Math.max(0, members.length - 1));
+  summonList.innerHTML = "";
+  if (members.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "member-empty";
+    empty.textContent = "拠点にファミリアはいません";
+    summonList.append(empty);
+  }
+  members.forEach((f, i) => {
+    const card = memberCard(f, "button");
+    const block = game.world.summonBlock(f);
+    if (block) {
+      card.classList.add("disabled");
+      const note = document.createElement("div");
+      note.className = "member-block";
+      note.textContent = SUMMON_BLOCK_TEXT[block];
+      card.append(note);
+    }
+    if (summonFocus === i) card.classList.add("focus");
+    card.addEventListener("click", () => {
+      summonFocus = i;
+      summonMember(f.id);
+    });
+    summonList.append(card);
+  });
+  const focused = members[summonFocus];
+  const fb = focused ? game.world.summonBlock(focused) : null;
+  summonNote.textContent = fb ? SUMMON_BLOCK_TEXT[fb] : "";
+}
+
+function summonMember(id: number): void {
+  const r = game.summonFromMenu(id);
+  if (r === "ok") {
+    stepper.reset();
+    summonFocus = 0;
+  }
+  renderSummon();
+}
+
+function closeSummon(): void {
+  game.closeSummon();
+  renderSummon();
+  syncOverlay();
+}
+
+summonBtn.addEventListener("click", () => {
+  if (game.openSummon()) {
+    summonFocus = 0;
+    renderSummon();
+    syncOverlay();
+  }
+});
+summonBack.addEventListener("click", closeSummon);
+
 function startRun(): void {
   const i = selection.selected;
   if (i === null) return;
@@ -284,6 +418,20 @@ let prevNav = 0;
 let shownDialog: string | null = null;
 function syncDialog(): void {
   const d = game.dialog;
+  if (d && d.kind === "talk") {
+    // 行動を選ぶダイアログ(はい/いいえの確認ダイアログとは別の表示)。状態が変わるたびに描き直す
+    dialogEl.hidden = true;
+    shownDialog = "talk";
+    if (!talkShown) talkFocus = 0;
+    talkShown = true;
+    renderTalk();
+    return;
+  }
+  if (talkShown) {
+    talkShown = false;
+    talkSig = "";
+    talkEl.hidden = true;
+  }
   const key = d ? (d.kind === "full" ? `full:${d.reason}` : d.kind) : null;
   if (key === shownDialog) return;
   shownDialog = key;
@@ -319,7 +467,7 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "Backquote") debugEl.hidden = !debugEl.hidden;
 });
 
-/** 画面(選択・拠点・連れ出す選択)の表示を、ゲームの状態に合わせる。画面の外から状態が変わっても追従する。 */
+/** 画面(選択・拠点・連れ出す選択・召喚)の表示を、ゲームの状態に合わせる。画面の外から状態が変わっても追従する。 */
 let shownMode: string | null = null;
 function syncScreens(): void {
   if (game.mode === shownMode) return;
@@ -328,8 +476,10 @@ function syncScreens(): void {
   renderSelect();
   renderBase();
   renderParty();
+  renderSummon();
 }
 
+let carryInteract = false;
 let last = performance.now();
 let alpha = 1;
 
@@ -369,6 +519,34 @@ function frame(now: number): void {
     }
   } else if (game.mode === "ended") {
     if (input.confirmPressed) returnToBase(); // Enter / A: 拠点へ
+  } else if (game.mode === "summon") {
+    // 召喚の一覧: ← → で移動、Enter / A で召喚、Esc / Start / B で戻る
+    const nav = input.moveX > 0.6 ? 1 : input.moveX < -0.6 ? -1 : 0;
+    if (nav !== 0 && nav !== prevNav) {
+      summonFocus = wrapFocus(summonFocus, nav, game.base.size);
+      renderSummon();
+    }
+    prevNav = nav;
+    if (input.confirmPressed) {
+      const f = game.base.members[summonFocus];
+      if (f) summonMember(f.id);
+    } else if (input.menuPressed || input.cancelPressed) {
+      closeSummon();
+    }
+  } else if (game.mode === "dialog" && game.dialog?.kind === "talk") {
+    // 話しかける: ↑ ↓ で選ぶ、Enter / A で決定、Esc / Start / B で閉じる
+    const f = game.world.familiars.find((o) => o.id === (game.dialog as { familiarId: number }).familiarId);
+    const actions = f ? talkActionsOf(game.world, f) : [];
+    const nav = input.moveY > 0.6 ? 1 : input.moveY < -0.6 ? -1 : 0;
+    if (nav !== 0 && nav !== prevNav) talkFocus = wrapFocus(talkFocus, nav, actions.length + 1);
+    prevNav = nav;
+    if (input.confirmPressed) {
+      const a = actions[talkFocus];
+      if (a) chooseTalk(a);
+      else cancelDialog();
+    } else if (input.menuPressed || input.cancelPressed) {
+      cancelDialog();
+    }
   } else if (game.mode === "dialog") {
     // ダイアログ表示中: Enter/A = はい(OK)、Esc/Start/B = いいえ(閉じる)
     if (input.confirmPressed) confirmDialog();
@@ -378,18 +556,25 @@ function frame(now: number): void {
   }
 
   const ctl = panel.controls;
+  // 押された情報(短いタップ)は、ワールドが1ステップも進まなかったフレームでは使われずに消えてしまうので、次のフレームへ持ち越す
+  const gameInput = carryInteract && !input.interact ? { ...input, interact: true } : input;
   if (game.mode === "world") {
     if (ctl.stepRequested) {
       ctl.stepRequested = false;
-      game.step(stepper.dt, input);
+      game.step(stepper.dt, gameInput);
+      carryInteract = false;
       alpha = 1;
     } else if (!ctl.paused) {
       const r = stepper.advance(frameDt * ctl.timeScale);
-      for (let i = 0; i < r.steps; i++) game.step(stepper.dt, input);
+      for (let i = 0; i < r.steps; i++) game.step(stepper.dt, gameInput);
+      carryInteract = gameInput.interact === true && r.steps === 0;
       alpha = r.alpha;
     } else {
+      carryInteract = false;
       alpha = 1;
     }
+  } else {
+    carryInteract = false;
   }
 
   // インタラクトボタンは、対象が近くにいる間だけ出す(助け起こしと雇用で表示を変える)
@@ -397,7 +582,7 @@ function frame(now: number): void {
   const showInteract = target !== null;
   if (interactBtn.hidden === showInteract) interactBtn.hidden = !showInteract;
   if (target) {
-    const label = target.kind === "revive" ? "助ける" : "雇用";
+    const label = target.kind === "revive" ? "助ける" : target.kind === "hire" ? "雇用" : "話す";
     if (interactBtn.dataset.kind !== target.kind) {
       interactBtn.dataset.kind = target.kind;
       interactBtn.innerHTML = `${label}<small>E / A</small>`;

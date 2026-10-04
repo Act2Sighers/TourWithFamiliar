@@ -86,10 +86,10 @@ describe("助け起こし", () => {
     g.x = g.prevX = 500;
     expect(w.interactionTarget()).toBeNull();
   });
-  it("元気なファミリアは対象にならない", () => {
+  it("元気なファミリアは、助け起こしの対象にならない(近ければ、話しかける対象になる)", () => {
     const w = new World(1, createDefaultParams());
     w.spawnFamiliar("aide");
-    expect(w.interactionTarget()).toBeNull();
+    expect(w.interactionTarget()?.kind).toBe("talk");
   });
   it("観測者が倒れているときは、助け起こしできない", () => {
     const { w, f } = downedAide();

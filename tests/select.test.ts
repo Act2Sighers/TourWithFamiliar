@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultParams } from "../src/core/params";
-import { CandidateSelection } from "../src/core/selection";
+import { CandidateSelection, wrapFocus } from "../src/core/selection";
 import { Game } from "../src/core/sim/game";
 import { DEFAULT_KIND_ID, FAMILIAR_KINDS, kindById } from "../src/core/sim/kinds";
 
@@ -138,5 +138,14 @@ describe("最初の側近の選択とラン開始", () => {
     const b = new Game(5, createDefaultParams(), { autoStart: false });
     b.startRun(DEFAULT_KIND_ID);
     expect(sim(b)).toBe(sim(a));
+  });
+});
+
+describe("wrapFocus(一覧のカーソル)", () => {
+  it("端で反対側へ回る。件数が0なら0", () => {
+    expect(wrapFocus(0, 1, 3)).toBe(1);
+    expect(wrapFocus(2, 1, 3)).toBe(0);
+    expect(wrapFocus(0, -1, 3)).toBe(2);
+    expect(wrapFocus(5, 1, 0)).toBe(0);
   });
 });
