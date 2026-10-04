@@ -362,3 +362,137 @@ body {
   background: #cfc6e6;
   color: #f5f0ff;
 }
+
+#base-screen,
+#party-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 24;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  background: rgba(255, 244, 232, 0.96);
+}
+
+#base-screen[hidden],
+#party-screen[hidden],
+#btn-to-base[hidden] {
+  display: none;
+}
+
+.member-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.member-list .candidate {
+  width: 118px;
+  padding: 12px 8px 10px;
+}
+
+.member-list .candidate-icon {
+  width: 52px;
+  height: 52px;
+  font-size: 20px;
+}
+
+.member-list .candidate-icon.companion {
+  background: #f5a25d;
+}
+
+.member-role {
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.member-hp {
+  height: 6px;
+  margin: 6px 4px 4px;
+  border-radius: 3px;
+  background: rgba(60, 30, 50, 0.2);
+  overflow: hidden;
+}
+
+.member-hp > i {
+  display: block;
+  height: 100%;
+  background: #6cc04a;
+}
+
+.member-hp-text {
+  font-size: 12px;
+}
+
+.member-empty {
+  margin: 8px 0 18px;
+  color: #8a6f6f;
+}
+
+#base-depart,
+#party-go,
+#party-back {
+  min-width: 140px;
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: #6a4cff;
+  color: #fff;
+  font-size: 17px;
+  touch-action: manipulation;
+}
+
+#party-back {
+  background: #9a8fb8;
+}
+
+#party-go:disabled {
+  background: #cfc6e6;
+  color: #f5f0ff;
+}
+
+#party-go.focus,
+#base-depart.focus {
+  outline: 3px solid #c9b6e6;
+  outline-offset: 2px;
+}
+
+.party-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+#party-info {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+#party-info.warn {
+  color: #c01060;
+}
+
+#btn-to-base {
+  position: fixed;
+  left: 50%;
+  bottom: max(48px, env(safe-area-inset-bottom));
+  z-index: 19;
+  transform: translateX(-50%);
+  min-width: 160px;
+  min-height: 52px;
+  border: 0;
+  border-radius: 14px;
+  background: #6a4cff;
+  color: #fff;
+  font-size: 18px;
+  touch-action: manipulation;
+}
+
+.overlay-card button.secondary {
+  display: block;
+  margin: 10px auto 0;
+  background: #9a8fb8;
+}

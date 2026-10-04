@@ -41,11 +41,36 @@
       </div>
     </div>
 
+    <div id="base-screen" hidden>
+      <div class="select-panel">
+        <h1>拠点</h1>
+        <div id="base-list" class="member-list"></div>
+        <button id="base-depart" type="button">遠征に出る</button>
+        <p class="hint">Enter / A で、遠征の準備へ進みます<br />拠点では、HPは自然には回復しません(遠征中に、拠点に残したファミリアが回復します)</p>
+      </div>
+    </div>
+
+    <div id="party-screen" hidden>
+      <div class="select-panel">
+        <h1>遠征に連れていくファミリアを選んでください</h1>
+        <div id="party-list" class="member-list"></div>
+        <p id="party-info"></p>
+        <div class="party-buttons">
+          <button id="party-go" type="button">出発</button>
+          <button id="party-back" type="button">戻る</button>
+        </div>
+        <p class="hint">← → で移動、Enter / A で選ぶ・出発　Esc / B で戻る<br />画面のタップでも操作できます</p>
+      </div>
+    </div>
+
+    <button id="btn-to-base" type="button" hidden>拠点へ</button>
+
     <div id="overlay" hidden>
       <div class="overlay-card">
         <h1>メニュー</h1>
         <p>ワールドの時間は止まっています</p>
         <button id="btn-resume" type="button">再開</button>
+        <button id="btn-abort" type="button" class="secondary">拠点に戻る</button>
         <p class="hint">Esc / P / ゲームパッドStart / ☰ で開閉</p>
       </div>
     </div>

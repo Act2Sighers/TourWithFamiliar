@@ -41,8 +41,6 @@ export class World {
   time = 0;
   readonly watcher: Watcher;
   familiars: Familiar[] = [];
-  /** 拠点(送還されたファミリアを預かる。遠征中は、HPがゆっくり回復する) */
-  readonly base = new Base();
   enemies: Enemy[] = [];
   neutrals: Neutral[] = [];
   readonly chunks: ChunkMap;
@@ -51,6 +49,8 @@ export class World {
   constructor(
     readonly seed: number,
     readonly params: Params,
+    /** 拠点。遠征をまたいで持ち越すので、ゲームから渡す。渡さなければ、このワールドだけの拠点になる */
+    readonly base: Base = new Base(),
   ) {
     this.chunks = new ChunkMap(seed, params);
     this.watcher = createBody(WATCHER_ID, 0, 0, params.watcher.radius, params.watcher.maxHp, WATCHER_NAME);
@@ -80,6 +80,18 @@ export class World {
       const r = rng.range(e.spawnMin, Math.max(e.spawnMin, e.spawnMax));
       this.spawnEnemy(this.watcher.x + Math.cos(a) * r, this.watcher.y + Math.sin(a) * r);
     }
+  }
+
+  /**
+   * 拠点から連れ出したファミリアを、遠征の開始時に、観測者の周りへ並べる(index 番目)。
+   * 個体のデータ(HP・役割・能力値)は変わらない。
+   */
+  deployFamiliar(f: Familiar, index: number): void {
+    const a = (index * Math.PI * 2) / this.params.party.maxFamiliars + Math.PI / 6;
+    f.x = f.prevX = this.watcher.x + Math.cos(a) * 45;
+    f.y = f.prevY = this.watcher.y + Math.sin(a) * 45;
+    resetFieldState(f, this.params);
+    this.familiars.push(f);
   }
 
   /** 中立個体をスポーンできるか(ワールド全体の上限)。 */

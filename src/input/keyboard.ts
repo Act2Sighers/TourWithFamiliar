@@ -1,5 +1,6 @@
 import type { InputSource } from "../core/input";
 
+const MOVE_KEYS = new Set(["KeyA", "KeyD", "KeyW", "KeyS", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
 const BLOCKED = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"]);
 
 export class KeyboardInput implements InputSource {
@@ -9,12 +10,15 @@ export class KeyboardInput implements InputSource {
   private confirmQueued = false;
   /** 短いタップでも、少なくとも1回のpollでは「押されている」と報告する */
   private interactQueued = false;
+  /** 移動キーの短いタップも同様に、次のpollまで保持する(メニューの左右移動などで取りこぼさないため) */
+  private moveQueued = new Set<string>();
 
   constructor(target: Window = window) {
     target.addEventListener("keydown", (e) => {
       if (isTypingTarget(e.target)) return;
       if (BLOCKED.has(e.code)) e.preventDefault();
       this.down.add(e.code);
+      if (MOVE_KEYS.has(e.code)) this.moveQueued.add(e.code);
       if ((e.code === "Escape" || e.code === "KeyP") && !e.repeat) this.menuQueued = true;
       if (e.code === "KeyE") this.interactQueued = true;
       if ((e.code === "Enter" || e.code === "NumpadEnter") && !e.repeat) this.confirmQueued = true;
@@ -24,11 +28,13 @@ export class KeyboardInput implements InputSource {
   }
 
   poll() {
+    const held = (code: string) => this.down.has(code) || this.moveQueued.has(code);
+    const left = held("KeyA") || held("ArrowLeft");
+    const right = held("KeyD") || held("ArrowRight");
+    const up = held("KeyW") || held("ArrowUp");
+    const down = held("KeyS") || held("ArrowDown");
+    this.moveQueued.clear();
     const d = this.down;
-    const left = d.has("KeyA") || d.has("ArrowLeft");
-    const right = d.has("KeyD") || d.has("ArrowRight");
-    const up = d.has("KeyW") || d.has("ArrowUp");
-    const down = d.has("KeyS") || d.has("ArrowDown");
     const menu = this.menuQueued;
     this.menuQueued = false;
     const confirm = this.confirmQueued;
