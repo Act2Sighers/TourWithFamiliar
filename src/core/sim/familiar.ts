@@ -13,7 +13,7 @@ import {
   type Fighter,
 } from "./combat";
 import { engageRangeOf } from "./ranges";
-import { maxHpOf, moveSpeedOf, type Abilities } from "./stats";
+import { lostSpeedOf, maxHpOf, moveSpeedOf, type Abilities } from "./stats";
 import type { World } from "./world";
 
 /** aide=側近 / companion=同行者 */
@@ -134,8 +134,8 @@ function stepStandby(f: Familiar, world: World, dt: number): void {
       startIdle(f, p);
     } else {
       target = watcher;
-      // 存在範囲の外では強制的に迷子速度。観測者が止まっていても戻れるよう、本来の速度を下限にする(暫定)
-      if (f.lost) speed = Math.max(p.familiar.lostSpeedRatio * Math.hypot(watcher.vx, watcher.vy), normalSpeed);
+      // 存在範囲の外では強制的に迷子速度(観測者の最高速度の1.5倍)
+      if (f.lost) speed = lostSpeedOf(p);
     }
   }
 

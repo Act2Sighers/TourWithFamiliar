@@ -149,22 +149,19 @@ describe("存在範囲", () => {
     expect(e2.state).toBe("engaged");
     expect(f.state).toBe("standby");
   });
-  it("存在範囲の外では、観測者の移動速度の1.5倍(下限は本来の速度)で戻ってくる", () => {
+  it("存在範囲の外では、観測者の最高速度の1.5倍(迷子速度)で戻ってくる。観測者が止まっていても同じ", () => {
     const { w, p } = quiet();
-    p.familiar.agility = 1; // 本来の速度を遅くして、迷子速度の効果を見る
     const f = w.spawnFamiliar("aide");
-    f.abilities = { toughness: 10, attack: 10, agility: 1 };
+    f.abilities = { toughness: 10, attack: 10, agility: 1 }; // 本来の速度は遅い
     f.x = f.prevX = existenceRangeOf(p) + 3000; // 数秒では範囲内に戻れない距離
     f.y = f.prevY = 0;
-    // 観測者が止まっているときは、本来の速度が下限になる
-    run(w, 2);
+    const lost = p.watcher.maxSpeed * p.familiar.lostSpeedRatio;
+    run(w, 2); // 観測者は止まっている
     expect(f.lost).toBe(true);
-    expect(Math.hypot(f.vx, f.vy)).toBeCloseTo(p.stats.speedPerAgility * 1, 0);
-    // 観測者が動いているときは、観測者の速度の1.5倍
-    run(w, 2, { moveX: 0, moveY: 1 });
-    expect(Math.hypot(w.watcher.vx, w.watcher.vy)).toBeCloseTo(p.watcher.maxSpeed, 0);
+    expect(Math.hypot(f.vx, f.vy)).toBeCloseTo(lost, 0);
+    run(w, 2, { moveX: 0, moveY: 1 }); // 観測者が動いていても、見るのは最高速度
     expect(f.lost).toBe(true);
-    expect(Math.hypot(f.vx, f.vy)).toBeCloseTo(p.watcher.maxSpeed * p.familiar.lostSpeedRatio, 0);
+    expect(Math.hypot(f.vx, f.vy)).toBeCloseTo(lost, 0);
   });
   it("存在範囲の中では本来の速度に戻る", () => {
     const { w, p } = quiet();

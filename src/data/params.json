@@ -1,7 +1,7 @@
 {
   "sim": { "hz": 60 },
   "world": { "chunkSize": 512, "decorPerChunk": 10, "keepRadius": 4 },
-  "watcher": { "radius": 14, "maxHp": 100, "maxSpeed": 90, "accel": 1400, "friction": 1800 },
+  "watcher": { "radius": 12, "maxHp": 100, "maxSpeed": 90, "accel": 1400, "friction": 1800 },
   "stats": { "hpPerToughness": 10, "speedPerAgility": 8.5, "damageCoefPerAttack": 0.1 },
   "ranges": { "existenceMultiplier": 15, "engageMultiplier": 3, "detectMultiplier": 2 },
   "familiar": {
@@ -13,8 +13,8 @@
     "friction": 1600,
     "standbyRange": 120,
     "wanderSpeedRatio": 0.6,
-    "idleMin": 1,
-    "idleMax": 3,
+    "idleMin": 3,
+    "idleMax": 5,
     "lostSpeedRatio": 1.5
   },
   "enemy": {
@@ -42,6 +42,7 @@
     "offset": 20,
     "hitRadius": 14
   },
+  "collision": { "enabled": 1, "massExponent": 2 },
   "view": { "zoom": 1, "showChunkBorders": 1, "decorOpacity": 0.5, "showStandbyRange": 1, "showAttackAreas": 1 },
   "input": { "deadzone": 0 }
 }

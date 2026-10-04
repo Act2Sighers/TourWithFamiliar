@@ -24,3 +24,16 @@ export function moveSpeedOf(a: Abilities, p: Params): number {
 export function attackPowerOf(a: Abilities, w: WeaponDef, p: Params): number {
   return Math.max(1, Math.round(w.baseDamage * a.attack * p.stats.damageCoefPerAttack));
 }
+
+/**
+ * 観測者が到達し得る移動速度の最高速度。
+ * 移動速度に当たるものは、その瞬間の速さではなく、この「到達し得る最高速度」を基準にする(将来はレリックなどの補正が入る)。
+ */
+export function watcherMaxSpeedOf(p: Params): number {
+  return p.watcher.maxSpeed;
+}
+
+/** 迷子速度: 存在範囲の外にいるファミリアの移動速度。 */
+export function lostSpeedOf(p: Params): number {
+  return watcherMaxSpeedOf(p) * p.familiar.lostSpeedRatio;
+}

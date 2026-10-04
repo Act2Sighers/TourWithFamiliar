@@ -169,9 +169,25 @@ export class Renderer {
       ctx.lineWidth = 3;
       ctx.stroke();
     }
+    this.drawFacingMarker(x, y, r, b.facing);
+  }
+
+  /**
+   * 向きの表示。底辺:高さ = 2:1 の二等辺三角形(頂点が直角)で、頂点が向いている方向に来る。
+   */
+  private drawFacingMarker(x: number, y: number, r: number, facing: number): void {
+    const ctx = this.ctx;
+    const h = r * 0.6; // 高さ。底辺の長さは 2h
+    const apex = r * 0.7; // 頂点までの距離
+    const baseDist = apex - h;
+    const c = Math.cos(facing);
+    const s = Math.sin(facing);
     ctx.fillStyle = "#ffffff";
     ctx.beginPath();
-    ctx.arc(x + Math.cos(b.facing) * r * 0.55, y + Math.sin(b.facing) * r * 0.55, r * 0.28, 0, Math.PI * 2);
+    ctx.moveTo(x + c * apex, y + s * apex);
+    ctx.lineTo(x + c * baseDist - s * h, y + s * baseDist + c * h);
+    ctx.lineTo(x + c * baseDist + s * h, y + s * baseDist - c * h);
+    ctx.closePath();
     ctx.fill();
   }
 

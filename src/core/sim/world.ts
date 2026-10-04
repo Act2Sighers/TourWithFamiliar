@@ -4,6 +4,7 @@ import type { Params } from "../params";
 import { Rng, hash2 } from "../rng";
 import { ChunkMap } from "./chunks";
 import { createBody, damage, distance, halt, isDown, setMaxHp, stepMotion, type Body } from "./body";
+import { resolveCollisions } from "./collision";
 import { hitCircle, weaponOf, type Fighter } from "./combat";
 import { createEnemy, enemyAbilities, stepEnemy, type Enemy } from "./enemy";
 import { createFamiliar, familiarAbilities, stepFamiliar, type Familiar, type FamiliarRole } from "./familiar";
@@ -159,6 +160,8 @@ export class World {
     for (const f of this.familiars) stepFamiliar(f, this, dt);
     for (const e of this.enemies) stepEnemy(e, this, dt);
 
+    resolveCollisions(this.collidableBodies(), p);
+
     this.resolveHits();
     this.enemies = this.enemies.filter((e) => !isDown(e));
 
@@ -166,6 +169,15 @@ export class World {
 
     this.tick++;
     this.time += dt;
+  }
+
+  /** 押し合いの対象。戦闘不能(HP0)のキャラクターは押し合いに参加しない。 */
+  private collidableBodies(): Body[] {
+    const out: Body[] = [];
+    if (!isDown(this.watcher)) out.push(this.watcher);
+    for (const f of this.familiars) if (!isDown(f)) out.push(f);
+    for (const e of this.enemies) if (!isDown(e)) out.push(e);
+    return out;
   }
 
   /** 持続中のヒット判定を、相手側の全員と照合する。1回の攻撃につき1体1回だけ当たる。 */
