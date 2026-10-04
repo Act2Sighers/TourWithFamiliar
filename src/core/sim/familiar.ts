@@ -6,6 +6,7 @@ import { chaseAndAttack } from "./behavior";
 import { createCombat, isBusy, resetCombat, stepCombat, weaponOf, type Fighter } from "./combat";
 import { engageRangeOf } from "./ranges";
 import { lostSpeedOf, maxHpOf, moveSpeedOf, type Abilities } from "./stats";
+import type { Neutral } from "./neutral";
 import type { World } from "./world";
 
 /** aide=側近 / companion=同行者 */
@@ -63,6 +64,24 @@ export function createFamiliar(id: number, role: FamiliarRole, x: number, y: num
     wander: { mode: "idle", timer: 0, tx: x, ty: y },
     rng: new Rng(hash2(seed, 0xfa, id)),
   };
+}
+
+/**
+ * 雇用: 中立個体を、同じIDのままファミリアにする(IDを保つので、その個体を狙っていた敵は狙い続ける)。
+ * 位置・速度・向き・HP・能力値・攻撃の途中経過を引き継ぐ。
+ */
+export function familiarFromNeutral(n: Neutral, role: FamiliarRole, seed: number, p: Params): Familiar {
+  const f = createFamiliar(n.id, role, n.x, n.y, seed, p);
+  f.abilities = n.abilities;
+  f.maxHp = maxHpOf(f.abilities, p);
+  f.hp = Math.min(n.hp, f.maxHp);
+  f.vx = n.vx;
+  f.vy = n.vy;
+  f.prevX = n.prevX;
+  f.prevY = n.prevY;
+  f.facing = n.facing;
+  f.combat = n.combat;
+  return f;
 }
 
 export function stepFamiliar(f: Familiar, world: World, dt: number): void {

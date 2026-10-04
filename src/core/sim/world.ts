@@ -11,6 +11,7 @@ import { createNeutral, neutralAbilities, stepNeutral, type Neutral } from "./ne
 import {
   createFamiliar,
   familiarAbilities,
+  familiarFromNeutral,
   reviveFamiliar,
   stepFamiliar,
   type Familiar,
@@ -21,11 +22,13 @@ import { attackPowerOf } from "./stats";
 
 export type Watcher = Body;
 
-/** インタラクトボタンの対象。M1cでは助け起こしだけ。将来は優先順位つきで種類が増える。 */
-export interface InteractionTarget {
-  kind: "revive";
-  familiar: Familiar;
-}
+/**
+ * インタラクトボタンの対象。優先順位は 助け起こし > 雇用。
+ * 助け起こしはボタンを押し続ける操作、雇用は押した瞬間に確認ダイアログが出る操作。
+ */
+export type InteractionTarget =
+  | { kind: "revive"; familiar: Familiar }
+  | { kind: "hire"; neutral: Neutral };
 
 const WATCHER_ID = 0;
 
@@ -75,6 +78,17 @@ export class World {
     }
   }
 
+  /** 中立個体をスポーンできるか(ワールド全体の上限)。 */
+  canSpawnNeutral(): boolean {
+    return this.neutrals.length < this.params.neutral.maxCount;
+  }
+
+  /** 上限を守って中立個体をスポーンする。ゲームとしてのスポーンは、必ずこちらを使う。 */
+  trySpawnNeutral(x: number, y: number): Neutral | null {
+    return this.canSpawnNeutral() ? this.spawnNeutral(x, y) : null;
+  }
+
+  /** 上限を守らない低レベルの生成(テストや内部用)。 */
   spawnNeutral(x: number, y: number): Neutral {
     const n = createNeutral(this.nextId++, x, y, this.seed, this.params);
     this.neutrals.push(n);
@@ -88,7 +102,7 @@ export class World {
     for (let i = 0; i < n.initialCount; i++) {
       const a = rng.range(0, Math.PI * 2);
       const r = rng.range(n.spawnMin, Math.max(n.spawnMin, n.spawnMax));
-      this.spawnNeutral(this.watcher.x + Math.cos(a) * r, this.watcher.y + Math.sin(a) * r);
+      this.trySpawnNeutral(this.watcher.x + Math.cos(a) * r, this.watcher.y + Math.sin(a) * r);
     }
   }
 
@@ -154,24 +168,54 @@ export class World {
     return best;
   }
 
+  /** ファミリアを1人増やせるか。人数上限は同行中のファミリア(拠点にいる者は含めない)と、そのうちの側近について。 */
+  canAddFamiliar(role: FamiliarRole): boolean {
+    const p = this.params.party;
+    if (this.familiars.length >= p.maxFamiliars) return false;
+    if (role === "aide" && this.familiars.filter((f) => f.role === "aide").length >= p.maxAides) return false;
+    return true;
+  }
+
   /**
-   * いまインタラクトボタンで何ができるか。複数あるときは優先順位で決める。
+   * いまインタラクトボタンで何ができるか。複数あるときは優先順位(助け起こし > 雇用)で決める。
    * 助け起こしは、戦闘不能で残っている(送還が決まっていない)側近のうち、最も近いもの。
+   * 雇用は、生きている中立個体のうち、最も近いもの(ボタンの出る距離は助け起こしより大きい)。
    */
   interactionTarget(): InteractionTarget | null {
     const w = this.watcher;
     if (isDown(w)) return null;
-    let best: Familiar | null = null;
-    let bestD = this.params.down.reviveRange;
+    let revive: Familiar | null = null;
+    let reviveD = this.params.down.reviveRange;
     for (const f of this.familiars) {
       if (!f.down || f.vanishing) continue;
       const d = distance(f, w);
-      if (d <= bestD) {
-        bestD = d;
-        best = f;
+      if (d <= reviveD) {
+        reviveD = d;
+        revive = f;
       }
     }
-    return best ? { kind: "revive", familiar: best } : null;
+    if (revive) return { kind: "revive", familiar: revive };
+    let hire: Neutral | null = null;
+    let hireD = this.params.party.hireRange;
+    for (const n of this.neutrals) {
+      if (isDown(n)) continue; // 戦闘不能の中立個体は雇用できない
+      const d = distance(n, w);
+      if (d <= hireD) {
+        hireD = d;
+        hire = n;
+      }
+    }
+    return hire ? { kind: "hire", neutral: hire } : null;
+  }
+
+  /** 雇用する: 中立個体を同行者(ファミリア)にする。人数上限や状態の条件を満たさなければ何もしない。 */
+  hireNeutral(id: number): Familiar | null {
+    const n = this.neutralById(id);
+    if (!n || isDown(n) || !this.canAddFamiliar("companion")) return null;
+    this.neutrals = this.neutrals.filter((o) => o !== n);
+    const f = familiarFromNeutral(n, "companion", this.seed, this.params);
+    this.familiars.push(f);
+    return f;
   }
 
   // ---- デバッグ ----
@@ -193,7 +237,7 @@ export class World {
   /** 観測者の少し離れた位置に中立個体を1体出す。 */
   debugSpawnNeutral(): void {
     const a = 1 + this.neutrals.length * 2.4;
-    this.spawnNeutral(this.watcher.x + Math.cos(a) * 200, this.watcher.y + Math.sin(a) * 200);
+    this.trySpawnNeutral(this.watcher.x + Math.cos(a) * 200, this.watcher.y + Math.sin(a) * 200);
   }
 
   /** 観測者の少し離れた位置に敵を1体出す。 */
@@ -268,7 +312,8 @@ export class World {
   /** 助け起こし: ボタンを押し続けている間だけ進む。 */
   private stepRevive(dt: number, held: boolean): void {
     const p = this.params;
-    const target = held ? this.interactionTarget() : null;
+    const t = held ? this.interactionTarget() : null;
+    const target = t && t.kind === "revive" ? t : null;
     for (const f of this.familiars) {
       if (!f.down) continue;
       if (target && target.familiar === f) f.reviveProgress += dt / p.down.reviveTime;

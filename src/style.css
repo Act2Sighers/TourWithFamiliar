@@ -215,3 +215,64 @@ body {
   letter-spacing: 0.1em;
   text-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
+#dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 22;
+  display: grid;
+  place-items: center;
+  background: rgba(60, 30, 50, 0.45);
+}
+
+#dialog[hidden] {
+  display: none;
+}
+
+.dialog-card {
+  min-width: 260px;
+  max-width: 88vw;
+  padding: 22px 26px 16px;
+  border-radius: 16px;
+  background: #fffaf4;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+.dialog-card p {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #4a2a5a;
+}
+
+.dialog-card p.hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  font-weight: normal;
+  color: #8a6f6f;
+}
+
+.dialog-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.dialog-buttons button {
+  min-width: 110px;
+  min-height: 46px;
+  border: 0;
+  border-radius: 12px;
+  background: #6a4cff;
+  color: #fff;
+  font-size: 16px;
+}
+
+.dialog-buttons button#dialog-no {
+  background: #9a8fb8;
+}
+
+.dialog-buttons button[hidden] {
+  display: none;
+}

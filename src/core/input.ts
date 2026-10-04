@@ -16,11 +16,15 @@ export interface InputSnapshot extends MoveInput {
   /** このフレームでメニュー切替が押された(エッジ) */
   menuPressed: boolean;
   interact: boolean;
+  /** ダイアログで「はい」: このフレームで押された(エッジ) */
+  confirmPressed: boolean;
+  /** ダイアログで「いいえ」: このフレームで押された(エッジ) */
+  cancelPressed: boolean;
 }
 
 /** 各入力デバイスが実装する。値は毎フレームpollされる。 */
 export interface InputSource {
-  poll(): { moveX: number; moveY: number; menu: boolean; interact: boolean };
+  poll(): { moveX: number; moveY: number; menu: boolean; interact: boolean; confirm: boolean; cancel: boolean };
 }
 
 /** 円形のデッドゾーン処理 + 長さ1へのクランプ。 */

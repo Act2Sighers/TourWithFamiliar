@@ -54,7 +54,11 @@ export interface Params {
     initialCount: number;
     spawnMin: number;
     spawnMax: number;
+    /** ワールド全体での中立個体の上限(スポーンするときの上限) */
+    maxCount: number;
   };
+  /** 同行できる人数の上限(拠点にいる者は含めない)と、雇用ボタンの距離。将来はレリックや親密度の平均で増える */
+  party: { maxAides: number; maxFamiliars: number; hireRange: number };
   /** 素手。武器ごとの固定値(攻撃間隔は将来、実効数値になる) */
   unarmed: {
     baseDamage: number;
@@ -125,6 +129,10 @@ export const PARAM_META: ParamMeta[] = [
   { path: "enemy.radius", label: "敵 半径", min: 6, max: 40, step: 1 },
   { path: "enemy.wanderDistMin", label: "敵 徘徊の歩く距離 最小", min: 0, max: 400, step: 5 },
   { path: "enemy.wanderDistMax", label: "敵 徘徊の歩く距離 最大", min: 0, max: 400, step: 5 },
+  { path: "neutral.maxCount", label: "中立個体のスポーン上限", min: 0, max: 40, step: 1 },
+  { path: "party.maxFamiliars", label: "ファミリアの人数上限", min: 1, max: 20, step: 1 },
+  { path: "party.maxAides", label: "側近の人数上限", min: 1, max: 10, step: 1 },
+  { path: "party.hireRange", label: "雇用ボタンの距離", min: 20, max: 300, step: 2 },
   { path: "neutral.toughness", label: "中立個体 丈夫さ", min: 1, max: 100, step: 1 },
   { path: "neutral.attack", label: "中立個体 攻撃力", min: 1, max: 100, step: 1 },
   { path: "neutral.agility", label: "中立個体 素早さ", min: 1, max: 100, step: 1 },

@@ -20,6 +20,11 @@ const debugBtn = document.getElementById("btn-debug") as HTMLElement;
 const resumeBtn = document.getElementById("btn-resume") as HTMLElement;
 const interactBtn = document.getElementById("btn-interact") as HTMLElement;
 const defeatEl = document.getElementById("defeat") as HTMLElement;
+const dialogEl = document.getElementById("dialog") as HTMLElement;
+const dialogMessage = document.getElementById("dialog-message") as HTMLElement;
+const dialogHint = document.getElementById("dialog-hint") as HTMLElement;
+const dialogYes = document.getElementById("dialog-yes") as HTMLElement;
+const dialogNo = document.getElementById("dialog-no") as HTMLElement;
 
 const initialSeed = 12345;
 const game = new Game(initialSeed, params);
@@ -98,14 +103,48 @@ function syncOverlay(): void {
   defeatEl.hidden = game.defeatTimer === null;
 }
 
-function toggleOverlay(): void {
-  game.toggleOverlay();
+function handleMenuButton(): void {
+  game.handleMenuButton();
   stepper.reset();
   syncOverlay();
 }
 
+function confirmDialog(): void {
+  game.confirmDialog();
+  stepper.reset();
+}
+
+function cancelDialog(): void {
+  game.cancelDialog();
+  stepper.reset();
+}
+
+/** 確認ダイアログの表示を、ゲームの状態に合わせる。 */
+let shownDialog: string | null = null;
+function syncDialog(): void {
+  const d = game.dialog;
+  const key = d ? d.kind : null;
+  if (key === shownDialog) return;
+  shownDialog = key;
+  dialogEl.hidden = d === null;
+  if (!d) return;
+  if (d.kind === "hire") {
+    dialogMessage.textContent = "この中立個体を雇用しますか？";
+    dialogYes.textContent = "はい";
+    dialogNo.hidden = false;
+    dialogHint.textContent = "Enter / A: はい　Esc / B: いいえ";
+  } else {
+    dialogMessage.textContent = "これ以上同行できません";
+    dialogYes.textContent = "OK";
+    dialogNo.hidden = true;
+    dialogHint.textContent = "Enter / A / Esc / B: 閉じる";
+  }
+}
+dialogYes.addEventListener("click", confirmDialog);
+dialogNo.addEventListener("click", cancelDialog);
+
 resumeBtn.addEventListener("click", () => {
-  if (game.mode === "overlay") toggleOverlay();
+  if (game.mode === "overlay") handleMenuButton();
 });
 debugBtn.addEventListener("click", () => {
   debugEl.hidden = !debugEl.hidden;
@@ -123,7 +162,13 @@ function frame(now: number): void {
   if (frameDt > 0) fps += (1 / frameDt - fps) * 0.1;
 
   const input = inputs.poll(params.input.deadzone);
-  if (input.menuPressed) toggleOverlay();
+  if (game.mode === "dialog") {
+    // ダイアログ表示中: Enter/A = はい(OK)、Esc/Start/B = いいえ(閉じる)
+    if (input.confirmPressed) confirmDialog();
+    else if (input.menuPressed || input.cancelPressed) cancelDialog();
+  } else if (input.menuPressed) {
+    handleMenuButton();
+  }
 
   const ctl = panel.controls;
   if (game.mode === "world") {
@@ -140,9 +185,18 @@ function frame(now: number): void {
     }
   }
 
-  // インタラクトボタンは、対象が近くにいる間だけ出す
-  const showInteract = game.mode === "world" && game.defeatTimer === null && game.world.interactionTarget() !== null;
+  // インタラクトボタンは、対象が近くにいる間だけ出す(助け起こしと雇用で表示を変える)
+  const target = game.mode === "world" && game.defeatTimer === null ? game.world.interactionTarget() : null;
+  const showInteract = target !== null;
   if (interactBtn.hidden === showInteract) interactBtn.hidden = !showInteract;
+  if (target) {
+    const label = target.kind === "revive" ? "助ける" : "雇用";
+    if (interactBtn.dataset.kind !== target.kind) {
+      interactBtn.dataset.kind = target.kind;
+      interactBtn.innerHTML = `${label}<small>E / A</small>`;
+    }
+  }
+  syncDialog();
   const defeated = game.defeatTimer !== null;
   if (defeatEl.hidden === defeated) defeatEl.hidden = !defeated;
 

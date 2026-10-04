@@ -67,11 +67,14 @@ export class Renderer {
       for (const e of world.enemies) this.drawAttackArea(e);
       for (const n of world.neutrals) this.drawAttackArea(n);
     }
+    const target = world.interactionTarget();
+    const reviveTarget = target?.kind === "revive" ? target.familiar : null;
+    const hireTarget = target?.kind === "hire" ? target.neutral : null;
     for (const e of world.enemies) this.drawEnemy(e, alpha);
     for (const n of world.neutrals) {
       this.drawCharacter(n, alpha, n.hp <= 0 ? "#c9b6bf" : "#5fb883", n.state === "engaged");
+      if (n === hireTarget) this.drawTargetRing(n, alpha, "rgba(36, 140, 90, 0.9)"); // 雇用できる
     }
-    const reviveTarget = world.interactionTarget()?.familiar ?? null;
     for (const f of world.familiars) {
       // 送還が決まったファミリアは、消えるまでの間に薄くなる
       this.ctx.globalAlpha = f.vanishing ? Math.max(0, 1 - f.downTimer / this.params.down.vanishDelay) : 1;
@@ -157,6 +160,21 @@ export class Renderer {
     if (f.down) return "#c9b6bf";
     if (f.role === "companion") return f.lost ? "#f2c9a0" : "#f5a25d";
     return f.lost ? "#e6a3bd" : "#ff7aa8";
+  }
+
+  /** インタラクトの対象であることを示す点線の輪。 */
+  private drawTargetRing(b: Body, alpha: number, color: string): void {
+    const ctx = this.ctx;
+    const x = b.prevX + (b.x - b.prevX) * alpha;
+    const y = b.prevY + (b.y - b.prevY) * alpha;
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y, b.radius * 1.9, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   /** 助け起こしのゲージ。対象にできる間は点線の輪、進んだ分は扇形で塗る。 */
@@ -249,12 +267,13 @@ export class Renderer {
   }
 
   /**
-   * 向きの表示。底辺:高さ = 2:1 の二等辺三角形(頂点が直角)で、頂点が向いている方向に来る。
+   * 向きの表示。底辺:高さ = 2:1 の二等辺三角形(頂点が直角)で、直角の頂点が向いている方向に来る。
+   * 頂点は本体の円の外周に接する。
    */
   private drawFacingMarker(x: number, y: number, r: number, facing: number): void {
     const ctx = this.ctx;
-    const h = r * 0.6; // 高さ。底辺の長さは 2h
-    const apex = r * 0.7; // 頂点までの距離
+    const h = r * 0.3; // 高さ。底辺の長さは 2h
+    const apex = r; // 頂点までの距離(外周に接する)
     const baseDist = apex - h;
     const c = Math.cos(facing);
     const s = Math.sin(facing);

@@ -47,8 +47,10 @@
     "wanderDistMax": 160,
     "initialCount": 2,
     "spawnMin": 350,
-    "spawnMax": 600
+    "spawnMax": 600,
+    "maxCount": 10
   },
+  "party": { "maxAides": 2, "maxFamiliars": 5, "hireRange": 72 },
   "unarmed": {
     "baseDamage": 10,
     "windup": 0.25,

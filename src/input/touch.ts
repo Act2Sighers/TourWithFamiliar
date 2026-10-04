@@ -12,6 +12,8 @@ export class TouchInput implements InputSource {
   private y = 0;
   private menuQueued = false;
   private interactHeld = false;
+  /** 短いタップでも、少なくとも1回のpollでは「押されている」と報告する */
+  private interactQueued = false;
   private readonly interactButton: HTMLElement;
   private readonly base: HTMLDivElement;
   private readonly knob: HTMLDivElement;
@@ -71,6 +73,7 @@ export class TouchInput implements InputSource {
     interactButton.addEventListener("pointerdown", (e) => {
       interactButton.setPointerCapture(e.pointerId);
       this.interactHeld = true;
+      this.interactQueued = true;
     });
     const release = () => {
       this.interactHeld = false;
@@ -84,7 +87,12 @@ export class TouchInput implements InputSource {
     const menu = this.menuQueued;
     this.menuQueued = false;
     // 押したままボタンが消えた(対象がいなくなった)場合に、押下状態が残らないようにする
-    if (this.interactButton.hidden) this.interactHeld = false;
-    return { moveX: this.x, moveY: this.y, menu, interact: this.interactHeld };
+    if (this.interactButton.hidden) {
+      this.interactHeld = false;
+      this.interactQueued = false;
+    }
+    const interact = this.interactHeld || this.interactQueued;
+    this.interactQueued = false;
+    return { moveX: this.x, moveY: this.y, menu, interact, confirm: false, cancel: false };
   }
 }

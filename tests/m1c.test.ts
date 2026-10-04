@@ -75,13 +75,13 @@ describe("助け起こし", () => {
   });
   it("対象が近くにいるときだけ、ボタンの対象が出る。最も近い者が対象になる", () => {
     const { w, f } = downedAide();
-    expect(w.interactionTarget()?.familiar).toBe(f);
+    expect(w.interactionTarget()).toEqual({ kind: "revive", familiar: f });
     const g = w.spawnFamiliar("aide");
     g.x = g.prevX = 15;
     g.y = g.prevY = 0;
     damage(g, 9999);
     w.step(dt, idle);
-    expect(w.interactionTarget()?.familiar).toBe(g);
+    expect(w.interactionTarget()).toEqual({ kind: "revive", familiar: g });
     f.x = f.prevX = 500;
     g.x = g.prevX = 500;
     expect(w.interactionTarget()).toBeNull();
