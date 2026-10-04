@@ -36,6 +36,19 @@ describe("押し合い", () => {
     resolveCollisions([a, b], p);
     expect(distance(a, b)).toBeGreaterThanOrEqual(19.99);
   });
+  it("動かない側の規則: 動かない側は動かず、相手が重なりを全部解消する", () => {
+    const a = createBody(1, 0, 0, 10, 1);
+    const b = createBody(2, 10, 0, 10, 1);
+    resolveCollisions([a, b], p, (x) => x === a);
+    expect(a.x).toBe(0);
+    expect(b.x).toBeCloseTo(20);
+  });
+  it("両方が動かない組は、押し合わない", () => {
+    const a = createBody(1, 0, 0, 10, 1);
+    const b = createBody(2, 10, 0, 10, 1);
+    resolveCollisions([a, b], p, () => true);
+    expect([a.x, b.x]).toEqual([0, 10]);
+  });
   it("無効にできる", () => {
     const q = createDefaultParams();
     q.collision.enabled = 0;
@@ -53,16 +66,49 @@ describe("押し合い", () => {
 
 describe("ワールドでの押し合い", () => {
   const dt = 1 / 60;
-  it("観測者はファミリアを押しのけて進めるが、押す分だけ遅くなる", () => {
+  it("観測者は、ファミリアに押されない(ファミリアが全部よける)。歩いても速さは変わらない", () => {
     const q = createDefaultParams();
+    const free = new World(1, q);
     const w = new World(1, q);
     const f = w.spawnFamiliar("aide");
     f.x = f.prevX = 30;
     f.y = f.prevY = 0;
     f.wander.timer = 999; // 立ち止まったまま
-    for (let i = 0; i < 60; i++) w.step(dt, { moveX: 1, moveY: 0 });
-    expect(f.x).toBeGreaterThan(30); // 押された
-    expect(w.watcher.x).toBeLessThan(q.watcher.maxSpeed); // 自由に歩いた距離より短い
+    for (let i = 0; i < 60; i++) {
+      free.step(dt, { moveX: 1, moveY: 0 });
+      w.step(dt, { moveX: 1, moveY: 0 });
+    }
+    expect(f.x).toBeGreaterThan(30); // ファミリアは押された
+    expect(w.watcher.x).toBeCloseTo(free.watcher.x, 6); // 観測者はファミリアがいない場合と同じ
+  });
+  it("立ち止まっている観測者に、待機中のファミリアが重なっても、観測者は動かない", () => {
+    const w = new World(1, createDefaultParams());
+    const f = w.spawnFamiliar("aide");
+    f.x = f.prevX = 5;
+    f.y = f.prevY = 0;
+    f.wander.timer = 999;
+    for (let i = 0; i < 120; i++) w.step(dt, { moveX: 0, moveY: 0 });
+    expect(w.watcher.x).toBe(0);
+    expect(w.watcher.y).toBe(0);
+    expect(distance(f, w.watcher)).toBeGreaterThanOrEqual(f.radius + w.watcher.radius - 0.01);
+  });
+  it("立ち止まっている観測者は、ファミリアが5分間うろついても、まったく動かない", () => {
+    const q = createDefaultParams();
+    q.familiar.standbyRange = 30; // 待機範囲を狭くして、観測者に重なりやすくする
+    const w = new World(3, q);
+    w.spawnFamiliar("aide");
+    w.spawnFamiliar("companion");
+    for (let i = 0; i < 60 * 300; i++) w.step(dt, { moveX: 0, moveY: 0 });
+    expect(w.watcher.x).toBe(0);
+    expect(w.watcher.y).toBe(0);
+  });
+  it("観測者と他の存在(敵・中立個体)の押し合いは、これまでどおり大きさで決まる", () => {
+    const w = new World(1, createDefaultParams());
+    const n = w.spawnNeutral(10, 0);
+    n.wander.timer = 999;
+    w.step(dt, { moveX: 0, moveY: 0 });
+    expect(w.watcher.x).toBeLessThan(0); // 観測者も少し押される
+    expect(n.x).toBeGreaterThan(10);
   });
   it("戦闘不能のキャラクターは押し合いに参加しない", () => {
     const w = new World(1, createDefaultParams());

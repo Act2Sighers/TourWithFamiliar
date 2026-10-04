@@ -294,7 +294,9 @@ export class World {
     for (const e of this.enemies) stepEnemy(e, this, dt);
     for (const n of this.neutrals) stepNeutral(n, this, dt);
 
-    resolveCollisions(this.collidableBodies(), p);
+    // 観測者とファミリアの押し合いだけは例外で、観測者は一切押されない(ファミリアが全部よける)
+    const fams = new Set<Body>(this.familiars);
+    resolveCollisions(this.collidableBodies(), p, (a, b) => a === w && fams.has(b));
 
     this.resolveHits();
     this.enemies = this.enemies.filter((e) => !isDown(e));
