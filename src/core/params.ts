@@ -7,7 +7,7 @@ export interface Params {
   watcher: { radius: number; maxHp: number; maxSpeed: number; accel: number; friction: number };
   stats: { hpPerToughness: number; speedPerAgility: number; damageCoefPerAttack: number };
   /** 待機範囲に対する倍率。存在範囲 / 応戦範囲 / 索敵範囲 */
-  ranges: { existenceMultiplier: number; engageMultiplier: number; detectMultiplier: number };
+  ranges: { existenceMultiplier: number; engageMultiplier: number; detectMultiplier: number; reactionMultiplier: number };
   familiar: {
     toughness: number;
     attack: number;
@@ -23,6 +23,23 @@ export interface Params {
     lostSpeedRatio: number;
   };
   enemy: {
+    toughness: number;
+    attack: number;
+    agility: number;
+    radius: number;
+    accel: number;
+    friction: number;
+    wanderSpeedRatio: number;
+    idleMin: number;
+    idleMax: number;
+    wanderDistMin: number;
+    wanderDistMax: number;
+    initialCount: number;
+    spawnMin: number;
+    spawnMax: number;
+  };
+  /** 中立個体(ファミリアになる前の存在)。徘徊は敵と同じ動き */
+  neutral: {
     toughness: number;
     attack: number;
     agility: number;
@@ -90,6 +107,7 @@ export const PARAM_META: ParamMeta[] = [
   { path: "ranges.existenceMultiplier", label: "存在範囲(待機範囲の倍)", min: 3, max: 40, step: 1 },
   { path: "ranges.engageMultiplier", label: "応戦範囲(待機範囲の倍)", min: 1, max: 10, step: 0.5 },
   { path: "ranges.detectMultiplier", label: "索敵範囲(待機範囲の倍)", min: 0.5, max: 8, step: 0.5 },
+  { path: "ranges.reactionMultiplier", label: "反応範囲(待機範囲の倍)", min: 0.5, max: 5, step: 0.5 },
   { path: "familiar.toughness", label: "ファミリア 丈夫さ", min: 1, max: 100, step: 1 },
   { path: "familiar.attack", label: "ファミリア 攻撃力", min: 1, max: 100, step: 1 },
   { path: "familiar.agility", label: "ファミリア 素早さ", min: 1, max: 100, step: 1 },
@@ -107,6 +125,12 @@ export const PARAM_META: ParamMeta[] = [
   { path: "enemy.radius", label: "敵 半径", min: 6, max: 40, step: 1 },
   { path: "enemy.wanderDistMin", label: "敵 徘徊の歩く距離 最小", min: 0, max: 400, step: 5 },
   { path: "enemy.wanderDistMax", label: "敵 徘徊の歩く距離 最大", min: 0, max: 400, step: 5 },
+  { path: "neutral.toughness", label: "中立個体 丈夫さ", min: 1, max: 100, step: 1 },
+  { path: "neutral.attack", label: "中立個体 攻撃力", min: 1, max: 100, step: 1 },
+  { path: "neutral.agility", label: "中立個体 素早さ", min: 1, max: 100, step: 1 },
+  { path: "neutral.radius", label: "中立個体 半径", min: 6, max: 40, step: 1 },
+  { path: "neutral.wanderDistMin", label: "中立個体 徘徊の歩く距離 最小", min: 0, max: 400, step: 5 },
+  { path: "neutral.wanderDistMax", label: "中立個体 徘徊の歩く距離 最大", min: 0, max: 400, step: 5 },
   { path: "unarmed.baseDamage", label: "素手 ダメージ基礎値", min: 1, max: 100, step: 1 },
   { path: "unarmed.windup", label: "素手 前隙(秒)", min: 0, max: 2, step: 0.05 },
   { path: "unarmed.active", label: "素手 持続(秒)", min: 0.02, max: 1, step: 0.02 },

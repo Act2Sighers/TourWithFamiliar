@@ -7,6 +7,7 @@ import { WATCHER_NAME, createBody, damage, distance, halt, isDown, setMaxHp, ste
 import { resolveCollisions } from "./collision";
 import { hitCircle, weaponOf, type Fighter } from "./combat";
 import { createEnemy, enemyAbilities, stepEnemy, type Enemy } from "./enemy";
+import { createNeutral, neutralAbilities, stepNeutral, type Neutral } from "./neutral";
 import {
   createFamiliar,
   familiarAbilities,
@@ -36,6 +37,7 @@ export class World {
   /** 拠点へ送還されたファミリア(M1cでは保管するだけ。回復も召喚もまだ無い) */
   readonly base: Familiar[] = [];
   enemies: Enemy[] = [];
+  neutrals: Neutral[] = [];
   readonly chunks: ChunkMap;
   private nextId = 1;
 
@@ -73,10 +75,28 @@ export class World {
     }
   }
 
+  spawnNeutral(x: number, y: number): Neutral {
+    const n = createNeutral(this.nextId++, x, y, this.seed, this.params);
+    this.neutrals.push(n);
+    return n;
+  }
+
+  /** 仮実装: 敵より少ない数の中立個体を、観測者の周囲のリング状の範囲へ、シードから決まる位置に固定で出す。 */
+  spawnInitialNeutrals(): void {
+    const n = this.params.neutral;
+    const rng = new Rng(hash2(this.seed, 0xa5, 0));
+    for (let i = 0; i < n.initialCount; i++) {
+      const a = rng.range(0, Math.PI * 2);
+      const r = rng.range(n.spawnMin, Math.max(n.spawnMin, n.spawnMax));
+      this.spawnNeutral(this.watcher.x + Math.cos(a) * r, this.watcher.y + Math.sin(a) * r);
+    }
+  }
+
   /** 調整パネルで変えた能力値を、既存のファミリア・敵に反映する(M1のみの暫定処理)。 */
   applyTemplateAbilities(): void {
     for (const f of this.familiars) f.abilities = familiarAbilities(this.params);
     for (const e of this.enemies) e.abilities = enemyAbilities(this.params);
+    for (const n of this.neutrals) n.abilities = neutralAbilities(this.params);
   }
 
   // ---- 参照 ----
@@ -85,11 +105,28 @@ export class World {
     return this.enemies.find((e) => e.id === id);
   }
 
-  /** 敵の攻撃対象になれる者: 生きている観測者と、存在範囲の中にいる生きているファミリア。 */
+  neutralById(id: number): Neutral | undefined {
+    return this.neutrals.find((n) => n.id === id);
+  }
+
+  isNeutral(b: Body): boolean {
+    return this.neutrals.some((n) => n === b);
+  }
+
+  /** 観測者側(観測者またはファミリア)か。 */
+  isPlayerSide(id: number): boolean {
+    return id === this.watcher.id || this.familiars.some((f) => f.id === id);
+  }
+
+  /**
+   * 敵の攻撃対象になれる者: 生きている観測者と、存在範囲の中にいる生きているファミリア、
+   * そして生きている中立個体。戦闘不能の者は対象にならない。
+   */
   enemyTargets(): Body[] {
     const out: Body[] = [];
     if (!isDown(this.watcher)) out.push(this.watcher);
     for (const f of this.familiars) if (!isDown(f) && !f.lost) out.push(f);
+    for (const n of this.neutrals) if (!isDown(n)) out.push(n);
     return out;
   }
 
@@ -97,12 +134,17 @@ export class World {
     return this.enemyTargets().find((b) => b.id === id);
   }
 
-  /** 臨戦中の敵のうち、指定位置に最も近いもの。 */
+  /** 敵が、観測者またはファミリアを攻撃対象にして臨戦になっているか。(中立個体を狙う敵は含まない) */
+  engagedOnPlayerSide(e: Enemy): boolean {
+    return e.state === "engaged" && e.targetId !== null && this.isPlayerSide(e.targetId);
+  }
+
+  /** 観測者側に臨戦している敵のうち、指定位置に最も近いもの。ファミリアの迎撃の対象を選ぶのに使う。 */
   nearestEngagedEnemy(x: number, y: number): Enemy | undefined {
     let best: Enemy | undefined;
     let bestD = Infinity;
     for (const e of this.enemies) {
-      if (e.state !== "engaged" || isDown(e)) continue;
+      if (!this.engagedOnPlayerSide(e) || isDown(e)) continue;
       const d = Math.hypot(e.x - x, e.y - y);
       if (d < bestD) {
         bestD = d;
@@ -146,6 +188,12 @@ export class World {
 
   debugSpawnCompanion(): void {
     this.spawnFamiliar("companion");
+  }
+
+  /** 観測者の少し離れた位置に中立個体を1体出す。 */
+  debugSpawnNeutral(): void {
+    const a = 1 + this.neutrals.length * 2.4;
+    this.spawnNeutral(this.watcher.x + Math.cos(a) * 200, this.watcher.y + Math.sin(a) * 200);
   }
 
   /** 観測者の少し離れた位置に敵を1体出す。 */
@@ -200,11 +248,16 @@ export class World {
     this.stepRevive(dt, input.interact ?? false);
     this.sendVanishedToBase();
     for (const e of this.enemies) stepEnemy(e, this, dt);
+    for (const n of this.neutrals) stepNeutral(n, this, dt);
 
     resolveCollisions(this.collidableBodies(), p);
 
     this.resolveHits();
     this.enemies = this.enemies.filter((e) => !isDown(e));
+    // 戦闘不能の中立個体は残るが、観測者を中心とした存在範囲の外に出たら消える
+    if (this.neutrals.some((n) => isDown(n) && distance(n, w) > existence)) {
+      this.neutrals = this.neutrals.filter((n) => !(isDown(n) && distance(n, w) > existence));
+    }
 
     this.chunks.prune(this.chunks.coordOf(w.x), this.chunks.coordOf(w.y));
 
@@ -242,12 +295,14 @@ export class World {
     if (!isDown(this.watcher)) out.push(this.watcher);
     for (const f of this.familiars) if (!isDown(f)) out.push(f);
     for (const e of this.enemies) if (!isDown(e)) out.push(e);
+    for (const n of this.neutrals) if (!isDown(n)) out.push(n);
     return out;
   }
 
   /** 持続中のヒット判定を、相手側の全員と照合する。1回の攻撃につき1体1回だけ当たる。 */
   private resolveHits(): void {
     for (const f of this.familiars) this.resolveAttack(f, this.enemies);
+    for (const n of this.neutrals) this.resolveAttack(n, this.enemies);
     const targets = this.enemyTargets();
     for (const e of this.enemies) this.resolveAttack(e, targets);
   }

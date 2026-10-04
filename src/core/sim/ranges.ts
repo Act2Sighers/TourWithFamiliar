@@ -20,3 +20,8 @@ export function engageRangeOf(p: Params): number {
 export function detectRangeOf(p: Params): number {
   return p.familiar.standbyRange * p.ranges.detectMultiplier;
 }
+
+/** 反応範囲: 敵が、自身を中心に中立個体へ反応する範囲(待機範囲と同じ大きさ)。 */
+export function reactionRangeOf(p: Params): number {
+  return p.familiar.standbyRange * p.ranges.reactionMultiplier;
+}

@@ -17,6 +17,7 @@ export interface PanelHooks {
   onDebugHealAll(): void;
   onDebugSpawnCompanion(): void;
   onDebugSpawnEnemy(): void;
+  onDebugSpawnNeutral(): void;
   onDebugSendFamiliarAway(): void;
   getStats(): Record<string, string>;
 }
@@ -65,6 +66,7 @@ export class DebugPanel {
       button("ファミリア -10HP", () => this.hooks.onDebugDamage("familiar", 10)),
       button("全員回復", () => this.hooks.onDebugHealAll()),
       button("同行者を1体追加", () => this.hooks.onDebugSpawnCompanion()),
+      button("中立個体を1体出す", () => this.hooks.onDebugSpawnNeutral()),
       button("敵を1体出す", () => this.hooks.onDebugSpawnEnemy()),
       button("ファミリアを存在範囲の外へ", () => this.hooks.onDebugSendFamiliarAway()),
     );

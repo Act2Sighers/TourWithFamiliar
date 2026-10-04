@@ -37,6 +37,7 @@ const panel = new DebugPanel(
     onDebugDamage: (target, amount) => game.world.debugDamage(target, amount),
     onDebugHealAll: () => game.world.debugHealAll(),
     onDebugSpawnCompanion: () => game.world.debugSpawnCompanion(),
+    onDebugSpawnNeutral: () => game.world.debugSpawnNeutral(),
     onDebugSpawnEnemy: () => game.world.debugSpawnEnemy(),
     onDebugSendFamiliarAway: () => game.world.debugSendFamiliarAway(),
     onResetWorld: (seed) => {
@@ -56,6 +57,7 @@ const panel = new DebugPanel(
         hp: `${w.watcher.hp}/${w.watcher.maxHp}`,
         ...familiarStats(),
         enemies: enemySummary(),
+        neutrals: neutralSummary(),
         chunks: String(w.chunks.count),
         fps: fps.toFixed(0),
       };
@@ -82,6 +84,13 @@ function enemySummary(): string {
   const es = game.world.enemies;
   const engaged = es.filter((e) => e.state === "engaged").length;
   return `${es.length} (臨戦 ${engaged})`;
+}
+
+function neutralSummary(): string {
+  const ns = game.world.neutrals;
+  const down = ns.filter((n) => n.hp <= 0).length;
+  const engaged = ns.filter((n) => n.state === "engaged").length;
+  return `${ns.length} (臨戦 ${engaged}, 戦闘不能 ${down})`;
 }
 
 function syncOverlay(): void {

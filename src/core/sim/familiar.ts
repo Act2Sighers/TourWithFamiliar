@@ -2,16 +2,8 @@
 import type { Params } from "../params";
 import { Rng, hash2 } from "../rng";
 import { createBody, distance, halt, isDown, setMaxHp, steerToward } from "./body";
-import {
-  createCombat,
-  isBusy,
-  resetCombat,
-  startAttackDistance,
-  stepCombat,
-  tryStartAttack,
-  weaponOf,
-  type Fighter,
-} from "./combat";
+import { chaseAndAttack } from "./behavior";
+import { createCombat, isBusy, resetCombat, stepCombat, weaponOf, type Fighter } from "./combat";
 import { engageRangeOf } from "./ranges";
 import { lostSpeedOf, maxHpOf, moveSpeedOf, type Abilities } from "./stats";
 import type { World } from "./world";
@@ -108,7 +100,8 @@ export function stepFamiliar(f: Familiar, world: World, dt: number): void {
   }
   if (f.state === "intercept") {
     const e = f.targetId === null ? undefined : world.enemyById(f.targetId);
-    if (!e || isDown(e) || (e.state !== "engaged" && distance(e, w) > engageRangeOf(p))) {
+    // 敵が倒れた、または(観測者側への)臨戦をやめたうえで応戦範囲(観測者中心)の外へ出たら解除
+    if (!e || isDown(e) || (!world.engagedOnPlayerSide(e) && distance(e, w) > engageRangeOf(p))) {
       f.state = "standby";
       f.targetId = null;
     }
@@ -118,14 +111,7 @@ export function stepFamiliar(f: Familiar, world: World, dt: number): void {
   if (busy) {
     halt(f, p.familiar.friction, dt);
   } else if (f.state === "intercept") {
-    const e = world.enemyById(f.targetId!)!;
-    if (distance(f, e) <= startAttackDistance(weapon, e.radius)) {
-      f.facing = Math.atan2(e.y - f.y, e.x - f.x);
-      halt(f, p.familiar.friction, dt);
-      tryStartAttack(f.combat, weapon, f.facing);
-    } else {
-      steerToward(f, e.x, e.y, moveSpeedOf(f.abilities, p), p.familiar.accel, p.familiar.friction, dt);
-    }
+    chaseAndAttack(f, world.enemyById(f.targetId!)!, moveSpeedOf(f.abilities, p), p.familiar.accel, p.familiar.friction, p, dt);
   } else {
     stepStandby(f, world, dt);
   }

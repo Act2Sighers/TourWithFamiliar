@@ -3,7 +3,7 @@
   "world": { "chunkSize": 512, "decorPerChunk": 10, "keepRadius": 4 },
   "watcher": { "radius": 12, "maxHp": 100, "maxSpeed": 90, "accel": 1400, "friction": 1800 },
   "stats": { "hpPerToughness": 10, "speedPerAgility": 8.5, "damageCoefPerAttack": 0.1 },
-  "ranges": { "existenceMultiplier": 15, "engageMultiplier": 3, "detectMultiplier": 2 },
+  "ranges": { "existenceMultiplier": 15, "engageMultiplier": 3, "detectMultiplier": 2, "reactionMultiplier": 1 },
   "familiar": {
     "toughness": 10,
     "attack": 10,
@@ -30,6 +30,22 @@
     "wanderDistMin": 40,
     "wanderDistMax": 160,
     "initialCount": 4,
+    "spawnMin": 350,
+    "spawnMax": 600
+  },
+  "neutral": {
+    "toughness": 10,
+    "attack": 10,
+    "agility": 10,
+    "radius": 12,
+    "accel": 1200,
+    "friction": 1600,
+    "wanderSpeedRatio": 0.6,
+    "idleMin": 1,
+    "idleMax": 3,
+    "wanderDistMin": 40,
+    "wanderDistMax": 160,
+    "initialCount": 2,
     "spawnMin": 350,
     "spawnMax": 600
   },
