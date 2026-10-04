@@ -18,6 +18,15 @@ interface Entry {
  */
 export class Base {
   private entries: Entry[] = [];
+  private nextId = 1;
+
+  /**
+   * 個体ID(ファミリア・敵・中立個体で共通)を払い出す。拠点は遠征をまたいで残るので、
+   * 持ち越したファミリアのIDが、次の遠征で生まれた敵・中立個体のIDとぶつからないよう、ここで一括管理する。
+   */
+  allocateId(): number {
+    return this.nextId++;
+  }
 
   get members(): Familiar[] {
     return this.entries.map((e) => e.familiar);

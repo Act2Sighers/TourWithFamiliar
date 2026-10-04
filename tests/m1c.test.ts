@@ -88,7 +88,9 @@ describe("助け起こし", () => {
   });
   it("元気なファミリアは、助け起こしの対象にならない(近ければ、話しかける対象になる)", () => {
     const w = new World(1, createDefaultParams());
-    w.spawnFamiliar("aide");
+    const a = w.spawnFamiliar("aide");
+    a.x = a.prevX = 20;
+    a.y = a.prevY = 0;
     expect(w.interactionTarget()?.kind).toBe("talk");
   });
   it("観測者が倒れているときは、助け起こしできない", () => {

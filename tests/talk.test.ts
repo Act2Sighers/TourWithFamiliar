@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultParams, type Params } from "../src/core/params";
 import { damage } from "../src/core/sim/body";
+import { DEFAULT_KIND_ID } from "../src/core/sim/kinds";
 import { Game } from "../src/core/sim/game";
 import { talkActionsOf } from "../src/core/sim/talk";
 
@@ -25,22 +26,29 @@ const step = (g: Game, n = 1, input = idle) => {
 };
 
 describe("話しかける(インタラクトの対象)", () => {
-  it("距離内にファミリアがいると、話しかける対象になる(範囲は雇用と同程度)", () => {
+  it("距離内にファミリアがいると、話しかける対象になる(範囲は雇用の半分)", () => {
     const { w, p, aide } = expedition();
-    expect(p.party.talkRange).toBe(p.party.hireRange);
+    expect(p.party.talkRange).toBe(p.party.hireRange / 2);
     aide.x = aide.prevX = p.party.talkRange - 5;
     aide.y = aide.prevY = 0;
     expect(w.interactionTarget()).toEqual({ kind: "talk", familiar: aide });
     aide.x = aide.prevX = p.party.talkRange + 20;
     expect(w.interactionTarget()).toBeNull();
   });
+  it("HPが0のファミリアには、downフラグが古くても話しかけられない", () => {
+    const { w, aide } = expedition();
+    aide.x = aide.prevX = 20;
+    aide.y = aide.prevY = 0;
+    aide.hp = 0; // ワールドが止まっていて、まだ戦闘不能の判定が走っていない状態
+    expect(w.interactionTarget()?.kind).not.toBe("talk");
+  });
   it("複数いれば、最も近い1人が対象になる", () => {
     const { w, aide } = expedition();
     const c = w.spawnFamiliar("companion");
     still(c);
-    aide.x = aide.prevX = 60;
+    aide.x = aide.prevX = 34;
     aide.y = aide.prevY = 0;
-    c.x = c.prevX = 30;
+    c.x = c.prevX = 15;
     c.y = c.prevY = 0;
     expect(w.interactionTarget()).toEqual({ kind: "talk", familiar: c });
   });
@@ -260,5 +268,23 @@ describe("メニューからの召喚", () => {
     const { g, away } = withAideAtBase();
     away.hp = 100;
     expect(g.summonFromMenu(away.id)).toBe("not_found");
+  });
+});
+
+describe("個体IDは遠征をまたいでも重複しない", () => {
+  it("持ち越したファミリアのIDと、次の遠征の敵・中立個体のIDがぶつからない", () => {
+    const g = new Game(1, createDefaultParams(), { autoStart: false });
+    g.startRun(DEFAULT_KIND_ID);
+    g.world.spawnFamiliar("companion");
+    g.world.spawnFamiliar("companion");
+    g.toggleOverlay();
+    g.requestAbort();
+    g.confirmDialog();
+    expect(g.mode).toBe("base");
+    g.openParty();
+    g.departExpedition(g.base.members.slice(0, 3).map((f) => f.id));
+    const w = g.world;
+    const ids = [w.watcher.id, ...w.familiars, ...w.enemies, ...w.neutrals].map((b) => (typeof b === "number" ? b : b.id));
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });

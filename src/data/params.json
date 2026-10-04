@@ -58,7 +58,7 @@
     "arrivalMinHpRatio": 0.05,
     "summonAideOnly": 1
   },
-  "party": { "maxAides": 2, "maxFamiliars": 5, "hireRange": 72, "talkRange": 72 },
+  "party": { "maxAides": 2, "maxFamiliars": 5, "hireRange": 72, "talkRange": 36 },
   "unarmed": {
     "baseDamage": 10,
     "windup": 0.25,

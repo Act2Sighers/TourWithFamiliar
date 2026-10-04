@@ -48,7 +48,6 @@ export class World {
   /** 召喚・送還の演出(見た目だけ。ワールドの時間で進み、終わったら消える) */
   effects: TeleportEffect[] = [];
   readonly chunks: ChunkMap;
-  private nextId = 1;
 
   constructor(
     readonly seed: number,
@@ -64,13 +63,13 @@ export class World {
 
   /** 観測者の近くにファミリアを1体出す。M1では能力値は調整パネルの値(全員同じ)。 */
   spawnFamiliar(role: FamiliarRole, kindId?: string): Familiar {
-    const f = createFamiliar(this.nextId++, role, this.watcher.x + 40, this.watcher.y + 30, this.seed, this.params, kindId);
+    const f = createFamiliar(this.base.allocateId(), role, this.watcher.x + 40, this.watcher.y + 30, this.seed, this.params, kindId);
     this.familiars.push(f);
     return f;
   }
 
   spawnEnemy(x: number, y: number): Enemy {
-    const e = createEnemy(this.nextId++, x, y, this.seed, this.params);
+    const e = createEnemy(this.base.allocateId(), x, y, this.seed, this.params);
     this.enemies.push(e);
     return e;
   }
@@ -110,7 +109,7 @@ export class World {
 
   /** 上限を守らない低レベルの生成(テストや内部用)。 */
   spawnNeutral(x: number, y: number): Neutral {
-    const n = createNeutral(this.nextId++, x, y, this.seed, this.params);
+    const n = createNeutral(this.base.allocateId(), x, y, this.seed, this.params);
     this.neutrals.push(n);
     return n;
   }
@@ -356,7 +355,7 @@ export class World {
     let talk: Familiar | null = null;
     let talkD = this.params.party.talkRange;
     for (const f of this.familiars) {
-      if (f.down) continue;
+      if (f.down || isDown(f)) continue;
       const d = distance(f, w);
       if (d <= talkD) {
         talkD = d;
