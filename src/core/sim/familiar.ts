@@ -30,6 +30,14 @@ export interface Familiar extends Fighter {
   targetId: number | null;
   /** 存在範囲の外にいる。ワールドが毎ステップ更新する */
   lost: boolean;
+  /** 戦闘不能(HP0)になっている */
+  down: boolean;
+  /** 戦闘不能になってからの経過時間(秒) */
+  downTimer: number;
+  /** 戦闘不能になった時点で送還が決まっている(同行者、または存在範囲の外で倒れた側近) */
+  vanishing: boolean;
+  /** 助け起こしの進捗 0..1 */
+  reviveProgress: number;
   wander: { mode: WanderMode; timer: number; tx: number; ty: number };
   rng: Rng;
 }
@@ -56,6 +64,10 @@ export function createFamiliar(id: number, role: FamiliarRole, x: number, y: num
     state: "standby",
     targetId: null,
     lost: false,
+    down: false,
+    downTimer: 0,
+    vanishing: false,
+    reviveProgress: 0,
     wander: { mode: "idle", timer: 0, tx: x, ty: y },
     rng: new Rng(hash2(seed, 0xfa, id)),
   };
@@ -68,14 +80,18 @@ export function stepFamiliar(f: Familiar, world: World, dt: number): void {
   f.radius = p.familiar.radius;
   setMaxHp(f, maxHpOf(f.abilities, p));
 
-  // HP0: 行動せず、攻撃対象にもならない(戦闘不能の詳細はM1c)
+  // HP0: 行動せず、攻撃対象にもならず、押し合いにも参加しない
   if (isDown(f)) {
+    if (!f.down) beginDown(f, world);
+    else f.downTimer += dt;
     f.state = "standby";
     f.targetId = null;
     resetCombat(f.combat);
     halt(f, p.familiar.friction, dt);
     return;
   }
+
+  if (f.down) clearDown(f); // 助け起こしなどで復活した
 
   const busy = isBusy(f.combat);
 
@@ -114,6 +130,32 @@ export function stepFamiliar(f: Familiar, world: World, dt: number): void {
     stepStandby(f, world, dt);
   }
   stepCombat(f.combat, weapon, dt);
+}
+
+function beginDown(f: Familiar, world: World): void {
+  f.down = true;
+  f.downTimer = 0;
+  f.reviveProgress = 0;
+  // 同行者は送還される。側近も存在範囲の外で倒れたら送還されるが、側近の最後の1人だけは例外
+  const otherAide = world.familiars.some((o) => o !== f && o.role === "aide");
+  f.vanishing = f.role === "companion" || (f.lost && otherAide);
+}
+
+function clearDown(f: Familiar): void {
+  f.down = false;
+  f.downTimer = 0;
+  f.vanishing = false;
+  f.reviveProgress = 0;
+}
+
+/** 助け起こし完了: 最大HPの一定割合で復活し、待機に戻る。 */
+export function reviveFamiliar(f: Familiar, p: Params): void {
+  f.hp = Math.max(1, Math.round(f.maxHp * p.down.reviveHpRatio));
+  clearDown(f);
+  f.state = "standby";
+  f.targetId = null;
+  resetCombat(f.combat);
+  startIdle(f, p);
 }
 
 function stepStandby(f: Familiar, world: World, dt: number): void {

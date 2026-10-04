@@ -7,11 +7,24 @@ import { createBody, damage, distance, halt, isDown, setMaxHp, stepMotion, type 
 import { resolveCollisions } from "./collision";
 import { hitCircle, weaponOf, type Fighter } from "./combat";
 import { createEnemy, enemyAbilities, stepEnemy, type Enemy } from "./enemy";
-import { createFamiliar, familiarAbilities, stepFamiliar, type Familiar, type FamiliarRole } from "./familiar";
+import {
+  createFamiliar,
+  familiarAbilities,
+  reviveFamiliar,
+  stepFamiliar,
+  type Familiar,
+  type FamiliarRole,
+} from "./familiar";
 import { existenceRangeOf } from "./ranges";
 import { attackPowerOf } from "./stats";
 
 export type Watcher = Body;
+
+/** インタラクトボタンの対象。M1cでは助け起こしだけ。将来は優先順位つきで種類が増える。 */
+export interface InteractionTarget {
+  kind: "revive";
+  familiar: Familiar;
+}
 
 const WATCHER_ID = 0;
 
@@ -19,7 +32,9 @@ export class World {
   tick = 0;
   time = 0;
   readonly watcher: Watcher;
-  readonly familiars: Familiar[] = [];
+  familiars: Familiar[] = [];
+  /** 拠点へ送還されたファミリア(M1cでは保管するだけ。回復も召喚もまだ無い) */
+  readonly base: Familiar[] = [];
   enemies: Enemy[] = [];
   readonly chunks: ChunkMap;
   private nextId = 1;
@@ -97,6 +112,26 @@ export class World {
     return best;
   }
 
+  /**
+   * いまインタラクトボタンで何ができるか。複数あるときは優先順位で決める。
+   * 助け起こしは、戦闘不能で残っている(送還が決まっていない)側近のうち、最も近いもの。
+   */
+  interactionTarget(): InteractionTarget | null {
+    const w = this.watcher;
+    if (isDown(w)) return null;
+    let best: Familiar | null = null;
+    let bestD = this.params.down.reviveRange;
+    for (const f of this.familiars) {
+      if (!f.down || f.vanishing) continue;
+      const d = distance(f, w);
+      if (d <= bestD) {
+        bestD = d;
+        best = f;
+      }
+    }
+    return best ? { kind: "revive", familiar: best } : null;
+  }
+
   // ---- デバッグ ----
 
   debugDamage(target: "watcher" | "familiar", amount: number): void {
@@ -107,6 +142,10 @@ export class World {
   debugHealAll(): void {
     this.watcher.hp = this.watcher.maxHp;
     for (const f of this.familiars) f.hp = f.maxHp;
+  }
+
+  debugSpawnCompanion(): void {
+    this.spawnFamiliar("companion");
   }
 
   /** 観測者の少し離れた位置に敵を1体出す。 */
@@ -135,7 +174,7 @@ export class World {
     w.radius = p.watcher.radius;
     setMaxHp(w, p.watcher.maxHp);
 
-    // 観測者(HP0なら動けない。倒れたときの扱いはM1c)
+    // 観測者(HP0なら動けない。倒れたあとの流れはGameが管理する)
     if (isDown(w)) {
       halt(w, p.watcher.friction, dt);
     } else {
@@ -158,6 +197,8 @@ export class World {
     for (const f of this.familiars) f.lost = distance(f, w) > existence;
 
     for (const f of this.familiars) stepFamiliar(f, this, dt);
+    this.stepRevive(dt, input.interact ?? false);
+    this.sendVanishedToBase();
     for (const e of this.enemies) stepEnemy(e, this, dt);
 
     resolveCollisions(this.collidableBodies(), p);
@@ -169,6 +210,30 @@ export class World {
 
     this.tick++;
     this.time += dt;
+  }
+
+  /** 助け起こし: ボタンを押し続けている間だけ進む。 */
+  private stepRevive(dt: number, held: boolean): void {
+    const p = this.params;
+    const target = held ? this.interactionTarget() : null;
+    for (const f of this.familiars) {
+      if (!f.down) continue;
+      if (target && target.familiar === f) f.reviveProgress += dt / p.down.reviveTime;
+      else if (p.down.reviveKeepProgress < 0.5) f.reviveProgress = 0;
+      if (f.reviveProgress >= 1) reviveFamiliar(f, p);
+    }
+  }
+
+  /** 送還が決まったファミリアを、一定時間後にフィールドから拠点へ移す。 */
+  private sendVanishedToBase(): void {
+    const delay = this.params.down.vanishDelay;
+    if (!this.familiars.some((f) => f.vanishing && f.downTimer >= delay)) return;
+    const keep: Familiar[] = [];
+    for (const f of this.familiars) {
+      if (f.vanishing && f.downTimer >= delay) this.base.push(f);
+      else keep.push(f);
+    }
+    this.familiars = keep;
   }
 
   /** 押し合いの対象。戦闘不能(HP0)のキャラクターは押し合いに参加しない。 */

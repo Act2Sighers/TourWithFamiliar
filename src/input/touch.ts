@@ -11,13 +11,15 @@ export class TouchInput implements InputSource {
   private x = 0;
   private y = 0;
   private menuQueued = false;
+  private interactHeld = false;
+  private readonly interactButton: HTMLElement;
   private readonly base: HTMLDivElement;
   private readonly knob: HTMLDivElement;
 
   /** スティックの最大傾き(CSSピクセル) */
   static readonly RADIUS = 56;
 
-  constructor(surface: HTMLElement, menuButton: HTMLElement) {
+  constructor(surface: HTMLElement, menuButton: HTMLElement, interactButton: HTMLElement) {
     this.base = document.createElement("div");
     this.base.className = "stick-base";
     this.knob = document.createElement("div");
@@ -63,11 +65,26 @@ export class TouchInput implements InputSource {
     menuButton.addEventListener("click", () => {
       this.menuQueued = true;
     });
+
+    this.interactButton = interactButton;
+    // インタラクトは押している間だけ有効(助け起こしなどの押し続ける操作のため)
+    interactButton.addEventListener("pointerdown", (e) => {
+      interactButton.setPointerCapture(e.pointerId);
+      this.interactHeld = true;
+    });
+    const release = () => {
+      this.interactHeld = false;
+    };
+    interactButton.addEventListener("pointerup", release);
+    interactButton.addEventListener("pointercancel", release);
+    interactButton.addEventListener("lostpointercapture", release);
   }
 
   poll() {
     const menu = this.menuQueued;
     this.menuQueued = false;
-    return { moveX: this.x, moveY: this.y, menu };
+    // 押したままボタンが消えた(対象がいなくなった)場合に、押下状態が残らないようにする
+    if (this.interactButton.hidden) this.interactHeld = false;
+    return { moveX: this.x, moveY: this.y, menu, interact: this.interactHeld };
   }
 }

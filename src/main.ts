@@ -18,12 +18,14 @@ const debugEl = document.getElementById("debug") as HTMLElement;
 const menuBtn = document.getElementById("btn-menu") as HTMLElement;
 const debugBtn = document.getElementById("btn-debug") as HTMLElement;
 const resumeBtn = document.getElementById("btn-resume") as HTMLElement;
+const interactBtn = document.getElementById("btn-interact") as HTMLElement;
+const defeatEl = document.getElementById("defeat") as HTMLElement;
 
 const initialSeed = 12345;
 const game = new Game(initialSeed, params);
 const renderer = new Renderer(canvas, params);
 const stepper = new FixedStepper(params.sim.hz);
-const inputs = new InputManager([new KeyboardInput(), new GamepadInput(), new TouchInput(canvas, menuBtn)]);
+const inputs = new InputManager([new KeyboardInput(), new GamepadInput(), new TouchInput(canvas, menuBtn, interactBtn)]);
 
 let fps = 60;
 
@@ -34,6 +36,7 @@ const panel = new DebugPanel(
     onParamChanged: (path) => game.onParamChanged(path),
     onDebugDamage: (target, amount) => game.world.debugDamage(target, amount),
     onDebugHealAll: () => game.world.debugHealAll(),
+    onDebugSpawnCompanion: () => game.world.debugSpawnCompanion(),
     onDebugSpawnEnemy: () => game.world.debugSpawnEnemy(),
     onDebugSendFamiliarAway: () => game.world.debugSendFamiliarAway(),
     onResetWorld: (seed) => {
@@ -66,8 +69,12 @@ function familiarStats(): Record<string, string> {
   const w = game.world;
   for (const f of w.familiars) {
     const d = Math.hypot(f.x - w.watcher.x, f.y - w.watcher.y);
-    out[`fam${f.id}`] = `${f.role} ${f.state}${f.lost ? "/lost" : ""}/${f.wander.mode} hp ${f.hp}/${f.maxHp} dist ${d.toFixed(0)} spd ${Math.hypot(f.vx, f.vy).toFixed(0)}`;
+    const status = f.down
+      ? `DOWN${f.vanishing ? "(送還)" : ` 助け${(f.reviveProgress * 100).toFixed(0)}%`}`
+      : `${f.state}${f.lost ? "/lost" : ""}/${f.wander.mode}`;
+    out[`fam${f.id}`] = `${f.role} ${status} hp ${f.hp}/${f.maxHp} dist ${d.toFixed(0)} spd ${Math.hypot(f.vx, f.vy).toFixed(0)}`;
   }
+  if (w.base.length > 0) out.base = `${w.base.length}体`;
   return out;
 }
 
@@ -79,6 +86,7 @@ function enemySummary(): string {
 
 function syncOverlay(): void {
   overlayEl.hidden = game.mode !== "overlay";
+  defeatEl.hidden = game.defeatTimer === null;
 }
 
 function toggleOverlay(): void {
@@ -122,6 +130,12 @@ function frame(now: number): void {
       alpha = 1;
     }
   }
+
+  // インタラクトボタンは、対象が近くにいる間だけ出す
+  const showInteract = game.mode === "world" && game.defeatTimer === null && game.world.interactionTarget() !== null;
+  if (interactBtn.hidden === showInteract) interactBtn.hidden = !showInteract;
+  const defeated = game.defeatTimer !== null;
+  if (defeatEl.hidden === defeated) defeatEl.hidden = !defeated;
 
   renderer.draw(game.world, alpha);
   panel.updateStats(now);

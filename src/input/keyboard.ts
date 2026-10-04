@@ -30,6 +30,7 @@ export class KeyboardInput implements InputSource {
       moveX: (right ? 1 : 0) - (left ? 1 : 0),
       moveY: (down ? 1 : 0) - (up ? 1 : 0),
       menu,
+      interact: d.has("KeyE"),
     };
   }
 }

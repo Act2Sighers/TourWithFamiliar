@@ -11,6 +11,7 @@ export class InputManager {
     let by = 0;
     let best = 0;
     let menu = false;
+    let interact = false;
     for (const s of this.sources) {
       const r = s.poll();
       const mag = Math.hypot(r.moveX, r.moveY);
@@ -20,10 +21,11 @@ export class InputManager {
         by = r.moveY;
       }
       menu ||= r.menu;
+      interact ||= r.interact;
     }
     const menuPressed = menu && !this.prevMenu;
     this.prevMenu = menu;
     const move = applyDeadzone(bx, by, deadzone);
-    return { ...move, menuPressed };
+    return { ...move, menuPressed, interact };
   }
 }

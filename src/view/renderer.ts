@@ -3,6 +3,7 @@ import type { Decor } from "../core/sim/chunks";
 import { shouldShowHpBar, type Body } from "../core/sim/body";
 import { attackArea, weaponOf, type Fighter } from "../core/sim/combat";
 import type { Enemy } from "../core/sim/enemy";
+import type { Familiar } from "../core/sim/familiar";
 import type { World } from "../core/sim/world";
 
 /** 画面の短辺がこの長さ(ワールド単位)に見える状態を zoom=1 とする。端末が違っても見える範囲を揃えるため。 */
@@ -64,9 +65,13 @@ export class Renderer {
       for (const e of world.enemies) this.drawAttackArea(e);
     }
     for (const e of world.enemies) this.drawEnemy(e, alpha);
+    const reviveTarget = world.interactionTarget()?.familiar ?? null;
     for (const f of world.familiars) {
-      const color = f.hp <= 0 ? "#c9b6bf" : f.lost ? "#e6a3bd" : "#ff7aa8";
-      this.drawCharacter(f, alpha, color, f.state === "intercept");
+      // 送還が決まったファミリアは、消えるまでの間に薄くなる
+      this.ctx.globalAlpha = f.vanishing ? Math.max(0, 1 - f.downTimer / this.params.down.vanishDelay) : 1;
+      this.drawCharacter(f, alpha, this.familiarColor(f), f.state === "intercept");
+      this.ctx.globalAlpha = 1;
+      if (f.down && !f.vanishing) this.drawReviveGauge(f, alpha, f === reviveTarget);
     }
     this.drawCharacter(wt, alpha, wt.hp <= 0 ? "#b9b0d9" : "#6a4cff", false);
     for (const e of world.enemies) this.drawHpBar(e, alpha);
@@ -139,6 +144,39 @@ export class Renderer {
         ctx.closePath();
     }
     ctx.fill();
+  }
+
+  private familiarColor(f: Familiar): string {
+    if (f.down) return "#c9b6bf";
+    if (f.role === "companion") return f.lost ? "#f2c9a0" : "#f5a25d";
+    return f.lost ? "#e6a3bd" : "#ff7aa8";
+  }
+
+  /** 助け起こしのゲージ。対象にできる間は点線の輪、進んだ分は扇形で塗る。 */
+  private drawReviveGauge(f: Familiar, alpha: number, ready: boolean): void {
+    const ctx = this.ctx;
+    const x = f.prevX + (f.x - f.prevX) * alpha;
+    const y = f.prevY + (f.y - f.prevY) * alpha;
+    const r = f.radius * 1.9;
+    if (ready) {
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "rgba(192, 16, 96, 0.8)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (f.reviveProgress > 0) {
+      const start = -Math.PI / 2;
+      ctx.fillStyle = "rgba(192, 16, 96, 0.6)";
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.arc(x, y, r, start, start + Math.min(1, f.reviveProgress) * Math.PI * 2);
+      ctx.closePath();
+      ctx.fill();
+    }
   }
 
   /** 待機範囲(観測者を中心とした円)。調整用の表示。 */

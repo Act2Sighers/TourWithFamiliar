@@ -1,6 +1,6 @@
 import type { InputSource } from "../core/input";
 
-/** 標準マッピングのゲームパッド(左スティック/十字キー、Startでメニュー)。 */
+/** 標準マッピングのゲームパッド(左スティック/十字キー、Startでメニュー、Aでインタラクト)。 */
 export class GamepadInput implements InputSource {
   poll() {
     const pads = typeof navigator.getGamepads === "function" ? navigator.getGamepads() : [];
@@ -15,8 +15,8 @@ export class GamepadInput implements InputSource {
         x = dx;
         y = dy;
       }
-      return { moveX: x, moveY: y, menu: !!b[9]?.pressed };
+      return { moveX: x, moveY: y, menu: !!b[9]?.pressed, interact: !!b[0]?.pressed };
     }
-    return { moveX: 0, moveY: 0, menu: false };
+    return { moveX: 0, moveY: 0, menu: false, interact: false };
   }
 }

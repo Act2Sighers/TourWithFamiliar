@@ -1,13 +1,22 @@
 // C#: GameSession(モード管理。ワールドとオーバーレイの切替をここに集約)
 import type { MoveInput } from "../input";
+import { isDown } from "./body";
 import type { Params } from "../params";
 import { World } from "./world";
 
-export type GameMode = "world" | "overlay";
+/** world=進行中 / overlay=メニュー表示中(ワールド停止) / ended=観測者が倒れてワールドが止まった */
+export type GameMode = "world" | "overlay" | "ended";
+
+const NO_INPUT: MoveInput = { moveX: 0, moveY: 0, interact: false };
 
 export class Game {
   mode: GameMode = "world";
   world: World;
+  /**
+   * 観測者が倒れてからの経過時間(秒)。倒れていなければ null。
+   * この間(ウェイト)、ワールドは動き続けるが、プレイヤーは何もできない。
+   */
+  defeatTimer: number | null = null;
 
   constructor(
     public seed: number,
@@ -27,10 +36,19 @@ export class Game {
   /** ワールド時間を進める。オーバーレイ中は完全に停止する(急かさない方針)。 */
   step(dt: number, input: MoveInput): void {
     if (this.mode !== "world") return;
-    this.world.step(dt, input);
+    const defeated = this.defeatTimer !== null;
+    this.world.step(dt, defeated ? NO_INPUT : input);
+    if (!defeated) {
+      if (isDown(this.world.watcher)) this.defeatTimer = 0;
+      return;
+    }
+    this.defeatTimer! += dt;
+    if (this.defeatTimer! >= this.params.run.defeatWait) this.mode = "ended";
   }
 
   toggleOverlay(): void {
+    if (this.defeatTimer !== null) return; // 倒れたあとは何もできない
+    if (this.mode === "ended") return;
     this.mode = this.mode === "world" ? "overlay" : "world";
   }
 
@@ -38,6 +56,7 @@ export class Game {
     this.seed = seed;
     this.world = this.createWorld(seed);
     this.mode = "world";
+    this.defeatTimer = null;
   }
 
   onParamChanged(path: string): void {

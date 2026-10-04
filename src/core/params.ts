@@ -48,6 +48,21 @@ export interface Params {
     offset: number;
     hitRadius: number;
   };
+  /** 戦闘不能と助け起こし */
+  down: {
+    /** 助け起こしにかかる時間(秒) */
+    reviveTime: number;
+    /** 復活時のHP(最大HPに対する割合) */
+    reviveHpRatio: number;
+    /** 1にすると、途中で離しても進捗を保持する(0なら最初から) */
+    reviveKeepProgress: number;
+    /** 助け起こしができる距離(観測者との中心間) */
+    reviveRange: number;
+    /** 送還が決まったファミリアが、戦闘不能から消えるまでの時間(秒) */
+    vanishDelay: number;
+  };
+  /** ラン全体。観測者が倒れてから、ワールドが止まるまでのウェイト(秒) */
+  run: { defeatWait: number };
   /** キャラクター同士の押し合い。質量 = 半径 ^ massExponent */
   collision: { enabled: number; massExponent: number };
   view: { zoom: number; showChunkBorders: number; decorOpacity: number; showStandbyRange: number; showAttackAreas: number };
@@ -99,6 +114,12 @@ export const PARAM_META: ParamMeta[] = [
   { path: "unarmed.interval", label: "素手 攻撃間隔(秒)", min: 0.2, max: 6, step: 0.1 },
   { path: "unarmed.offset", label: "素手 範囲の前方距離", min: 0, max: 100, step: 1 },
   { path: "unarmed.hitRadius", label: "素手 範囲の半径", min: 2, max: 80, step: 1 },
+  { path: "down.reviveTime", label: "助け起こしの所要時間(秒)", min: 0.5, max: 10, step: 0.5 },
+  { path: "down.reviveHpRatio", label: "復活時のHP割合", min: 0.01, max: 1, step: 0.01 },
+  { path: "down.reviveKeepProgress", label: "助け起こし進捗の保持(0/1)", min: 0, max: 1, step: 1 },
+  { path: "down.reviveRange", label: "助け起こしの距離", min: 20, max: 200, step: 2 },
+  { path: "down.vanishDelay", label: "送還までの時間(秒)", min: 0.1, max: 5, step: 0.1 },
+  { path: "run.defeatWait", label: "観測者が倒れてから止まるまで(秒)", min: 0, max: 10, step: 0.5 },
   { path: "collision.enabled", label: "押し合い(0/1)", min: 0, max: 1, step: 1 },
   { path: "collision.massExponent", label: "押し合いの質量(半径のべき乗)", min: 0, max: 4, step: 0.5 },
   { path: "input.deadzone", label: "スティック遊び", min: 0, max: 0.6, step: 0.01 },
