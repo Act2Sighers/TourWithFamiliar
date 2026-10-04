@@ -1,6 +1,6 @@
 import { PARAM_META, createDefaultParams, getParam, mergeParams, setParam, type Params } from "../core/params";
 
-const STORAGE_KEY = "twf.params.v1";
+const STORAGE_KEY = "twf.params.v2";
 
 export interface DebugControls {
   paused: boolean;

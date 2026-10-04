@@ -99,7 +99,7 @@ export class Renderer {
 
   private drawDecor(d: Decor): void {
     const ctx = this.ctx;
-    ctx.fillStyle = `hsl(${Math.round(d.hue * 360)} 70% 78%)`;
+    ctx.fillStyle = `hsl(${Math.round(d.hue * 360)} 70% 78% / ${this.params.view.decorOpacity})`;
     ctx.beginPath();
     const s = d.size;
     switch (d.kind) {

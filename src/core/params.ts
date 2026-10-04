@@ -5,7 +5,7 @@ export interface Params {
   sim: { hz: number };
   world: { chunkSize: number; decorPerChunk: number; keepRadius: number };
   watcher: { radius: number; maxSpeed: number; accel: number; friction: number };
-  view: { zoom: number; showChunkBorders: number };
+  view: { zoom: number; showChunkBorders: number; decorOpacity: number };
   input: { deadzone: number };
 }
 
@@ -26,6 +26,7 @@ export const PARAM_META: ParamMeta[] = [
   { path: "input.deadzone", label: "スティック遊び", min: 0, max: 0.6, step: 0.01 },
   { path: "view.zoom", label: "ズーム", min: 0.4, max: 2.5, step: 0.05 },
   { path: "view.showChunkBorders", label: "チャンク境界表示(0/1)", min: 0, max: 1, step: 1 },
+  { path: "view.decorOpacity", label: "装飾の不透明度", min: 0, max: 1, step: 0.05 },
   { path: "world.decorPerChunk", label: "チャンク装飾数", min: 0, max: 60, step: 1 },
 ];
 
