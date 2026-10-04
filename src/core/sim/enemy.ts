@@ -35,7 +35,7 @@ export function enemyAbilities(p: Params): Abilities {
 export function createEnemy(id: number, x: number, y: number, seed: number, p: Params): Enemy {
   const abilities = enemyAbilities(p);
   return {
-    ...createBody(id, x, y, p.enemy.radius, maxHpOf(abilities, p)),
+    ...createBody(id, x, y, p.enemy.radius, maxHpOf(abilities, p), "EN"),
     abilities,
     weaponId: "unarmed",
     combat: createCombat(),

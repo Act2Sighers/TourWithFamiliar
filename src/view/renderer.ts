@@ -1,6 +1,6 @@
 import type { Params } from "../core/params";
 import type { Decor } from "../core/sim/chunks";
-import { shouldShowHpBar, type Body } from "../core/sim/body";
+import { WATCHER_NAME, shouldShowHpBar, type Body } from "../core/sim/body";
 import { attackArea, weaponOf, type Fighter } from "../core/sim/combat";
 import type { Enemy } from "../core/sim/enemy";
 import type { Familiar } from "../core/sim/familiar";
@@ -9,6 +9,13 @@ import type { World } from "../core/sim/world";
 /** 画面の短辺がこの長さ(ワールド単位)に見える状態を zoom=1 とする。端末が違っても見える範囲を揃えるため。 */
 const BASE_VIEW = 600;
 const GRID = 64;
+/** 名前を表示する円の半径 / 本体の半径 */
+const NAME_CIRCLE_RATIO = 0.8;
+/**
+ * 敵(正三角形)の描画サイズ。※暫定: 敵の「半径」を三角形の内接円の半径とみなし、外接円をその2倍で描く。
+ * こうすると、名前の円(半径の80%)が三角形の内側に収まる。当たり判定の円(半径)は変えない。
+ */
+const ENEMY_SHAPE_SCALE = 2;
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -74,7 +81,7 @@ export class Renderer {
       if (f.down && !f.vanishing) this.drawReviveGauge(f, alpha, f === reviveTarget);
     }
     this.drawCharacter(wt, alpha, wt.hp <= 0 ? "#b9b0d9" : "#6a4cff", false);
-    for (const e of world.enemies) this.drawHpBar(e, alpha);
+    for (const e of world.enemies) this.drawHpBar(e, alpha, e.radius * ENEMY_SHAPE_SCALE);
     for (const f of world.familiars) this.drawHpBar(f, alpha);
     this.drawHpBar(wt, alpha);
 
@@ -207,20 +214,55 @@ export class Renderer {
       ctx.lineWidth = 3;
       ctx.stroke();
     }
+    this.drawNameCircle(b.name, x, y, r * NAME_CIRCLE_RATIO);
     this.drawFacingMarker(x, y, r, b.facing);
   }
 
   /**
+   * 名前を表示する円。本体の半径の80%。文字の大きさは一定ではなく、円の内側に収まることを優先する。
+   * 観測者の名前「◎」だけは、文字ではなく図形(同心円)で描く。
+   */
+  private drawNameCircle(name: string, x: number, y: number, R: number): void {
+    const ctx = this.ctx;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, Math.PI * 2);
+    ctx.fill();
+    if (name === "") return;
+    ctx.strokeStyle = ctx.fillStyle = "#4a2a5a";
+    if (name === WATCHER_NAME) {
+      ctx.lineWidth = Math.max(1, R * 0.16);
+      ctx.beginPath();
+      ctx.arc(x, y, R * 0.68, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, R * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+    // 円の内側(直径の約85%)に文字列の幅が収まる大きさにする
+    const probe = 100;
+    ctx.font = `bold ${probe}px system-ui, sans-serif`;
+    const width = ctx.measureText(name).width;
+    const size = Math.min((probe * R * 2 * 0.85) / width, R * 1.4);
+    ctx.font = `bold ${size}px system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(name, x, y + size * 0.04);
+  }
+
+  /**
    * 向きの表示。底辺:高さ = 2:1 の二等辺三角形(頂点が直角)で、頂点が向いている方向に来る。
+   * 名前の円の外側かつ本体の円の内側に収まる大きさにする(底辺を名前円の縁に置き、頂点が本体の縁に届く手前まで)。
    */
   private drawFacingMarker(x: number, y: number, r: number, facing: number): void {
     const ctx = this.ctx;
-    const h = r * 0.6; // 高さ。底辺の長さは 2h
-    const apex = r * 0.7; // 頂点までの距離
-    const baseDist = apex - h;
+    const baseDist = r * NAME_CIRCLE_RATIO; // 底辺の位置
+    const h = r * 0.17; // 高さ。底辺の長さは 2h
+    const apex = baseDist + h; // 頂点までの距離(本体の縁の手前)
     const c = Math.cos(facing);
     const s = Math.sin(facing);
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = "#4a2a5a"; // 名前の円(白)と同化しないように、名前と同じ濃い色
     ctx.beginPath();
     ctx.moveTo(x + c * apex, y + s * apex);
     ctx.lineTo(x + c * baseDist - s * h, y + s * baseDist + c * h);
@@ -238,13 +280,15 @@ export class Renderer {
     ctx.beginPath();
     for (let i = 0; i < 3; i++) {
       const a = e.facing + (i * Math.PI * 2) / 3;
-      const px = x + Math.cos(a) * e.radius;
-      const py = y + Math.sin(a) * e.radius;
+      const px = x + Math.cos(a) * e.radius * ENEMY_SHAPE_SCALE;
+      const py = y + Math.sin(a) * e.radius * ENEMY_SHAPE_SCALE;
       if (i === 0) ctx.moveTo(px, py);
       else ctx.lineTo(px, py);
     }
     ctx.closePath();
     ctx.fill();
+    // 名前の円(半径の80%)
+    this.drawNameCircle(e.name, x, y, e.radius * NAME_CIRCLE_RATIO);
   }
 
   /** 攻撃範囲。前隙の間は輪郭だけ、持続の間は塗りつぶす。 */
@@ -268,7 +312,7 @@ export class Renderer {
   }
 
   /** HPゲージ。全快のときとHP0のときは描かない(共通規則)。 */
-  private drawHpBar(b: Body, alpha: number): void {
+  private drawHpBar(b: Body, alpha: number, extent = b.radius): void {
     if (!shouldShowHpBar(b.hp, b.maxHp)) return;
     const ctx = this.ctx;
     const x = b.prevX + (b.x - b.prevX) * alpha;
@@ -276,7 +320,7 @@ export class Renderer {
     const w = Math.max(24, b.radius * 2.4);
     const h = 5;
     const left = x - w / 2;
-    const top = y - b.radius - 12;
+    const top = y - extent - 12;
     const ratio = b.hp / b.maxHp;
     ctx.fillStyle = "rgba(60, 30, 50, 0.65)";
     ctx.fillRect(left - 1, top - 1, w + 2, h + 2);

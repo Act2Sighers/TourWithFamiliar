@@ -15,11 +15,16 @@ export interface Body {
   radius: number;
   hp: number;
   maxHp: number;
+  /** 本体の中の円に表示する名前。観測者だけは図形の「◎」(文字ではない) */
+  name: string;
 }
 
-export function createBody(id: number, x: number, y: number, radius: number, maxHp: number): Body {
-  return { id, x, y, vx: 0, vy: 0, prevX: x, prevY: y, facing: Math.PI / 2, radius, hp: maxHp, maxHp };
+export function createBody(id: number, x: number, y: number, radius: number, maxHp: number, name = ""): Body {
+  return { id, x, y, vx: 0, vy: 0, prevX: x, prevY: y, facing: Math.PI / 2, radius, hp: maxHp, maxHp, name };
 }
+
+/** 観測者の名前。文字ではなく図形(同心円)として描く。 */
+export const WATCHER_NAME = "◎";
 
 /**
  * 慣性つきの移動。目標速度へ向けて、入力中は accel、無入力中は friction の大きさで速度を変化させる。

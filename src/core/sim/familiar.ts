@@ -56,7 +56,7 @@ export function familiarAbilities(p: Params): Abilities {
 export function createFamiliar(id: number, role: FamiliarRole, x: number, y: number, seed: number, p: Params): Familiar {
   const abilities = familiarAbilities(p);
   return {
-    ...createBody(id, x, y, p.familiar.radius, maxHpOf(abilities, p)),
+    ...createBody(id, x, y, p.familiar.radius, maxHpOf(abilities, p), "FM"),
     abilities,
     weaponId: "unarmed",
     combat: createCombat(),

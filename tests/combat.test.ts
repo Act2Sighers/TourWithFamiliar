@@ -32,7 +32,7 @@ describe("攻撃の流れ(前隙 → 持続 → 後隙)", () => {
   const w = p.unarmed;
   it("ヒット判定は持続の間だけ出る。攻撃間隔が過ぎるまで次は始められない", () => {
     const c = createCombat();
-    const body = { id: 1, x: 0, y: 0, vx: 0, vy: 0, prevX: 0, prevY: 0, facing: 0, radius: 10, hp: 1, maxHp: 1 };
+    const body = { id: 1, x: 0, y: 0, vx: 0, vy: 0, prevX: 0, prevY: 0, facing: 0, radius: 10, hp: 1, maxHp: 1, name: "" };
     expect(tryStartAttack(c, w, 0)).toBe(true);
     expect(tryStartAttack(c, w, 0)).toBe(false);
     const seen: string[] = [];
@@ -48,7 +48,7 @@ describe("攻撃の流れ(前隙 → 持続 → 後隙)", () => {
   });
   it("ヒット判定はキャラクターの前方(開始時の向き)に出る", () => {
     const c = createCombat();
-    const body = { id: 1, x: 100, y: 50, vx: 0, vy: 0, prevX: 0, prevY: 0, facing: 0, radius: 10, hp: 1, maxHp: 1 };
+    const body = { id: 1, x: 100, y: 50, vx: 0, vy: 0, prevX: 0, prevY: 0, facing: 0, radius: 10, hp: 1, maxHp: 1, name: "" };
     tryStartAttack(c, w, Math.PI / 2); // 下向き
     c.phase = "active";
     const h = hitCircle(body, c, w)!;

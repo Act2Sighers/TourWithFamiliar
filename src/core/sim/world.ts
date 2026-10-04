@@ -3,7 +3,7 @@ import type { MoveInput } from "../input";
 import type { Params } from "../params";
 import { Rng, hash2 } from "../rng";
 import { ChunkMap } from "./chunks";
-import { createBody, damage, distance, halt, isDown, setMaxHp, stepMotion, type Body } from "./body";
+import { WATCHER_NAME, createBody, damage, distance, halt, isDown, setMaxHp, stepMotion, type Body } from "./body";
 import { resolveCollisions } from "./collision";
 import { hitCircle, weaponOf, type Fighter } from "./combat";
 import { createEnemy, enemyAbilities, stepEnemy, type Enemy } from "./enemy";
@@ -44,7 +44,7 @@ export class World {
     readonly params: Params,
   ) {
     this.chunks = new ChunkMap(seed, params);
-    this.watcher = createBody(WATCHER_ID, 0, 0, params.watcher.radius, params.watcher.maxHp);
+    this.watcher = createBody(WATCHER_ID, 0, 0, params.watcher.radius, params.watcher.maxHp, WATCHER_NAME);
   }
 
   // ---- 生成 ----
